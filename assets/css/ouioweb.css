@@ -1,0 +1,356 @@
+/* OUIOWEB — Prio CSS (chargée en dernier) */
+:root{
+  --ow-primary:#0d47ff; --ow-primary-600:#0b3fe0; --ow-sidebar:#0d2a6b;
+  --ow-bg:#f5f7fb; --ow-card:#fff; --ow-border:#e5e7eb;
+}
+
+/* Rendu sidebar pour le HTML existant (offcanvas + nav-link) */
+body.client #sidebarMenu.offcanvas-md.offcanvas-end{
+  position: sticky !important; top:0 !important; align-self:flex-start !important;
+  width:240px !important; max-width:240px !important; border:0 !important;
+  transform:none !important; visibility:visible !important;
+  background:var(--ow-sidebar) !important; color:#fff !important; box-shadow:none !important;
+}
+@media (max-width: 767.98px){
+  body.client #sidebarMenu.offcanvas-md.offcanvas-end{
+    width:85vw !important; max-width:320px !important; right:0 !important; left:auto !important;
+    background:var(--ow-sidebar) !important; color:#fff !important;
+  }
+}
+body.client #sidebarMenu .offcanvas-body{
+  padding:14px 8px 18px !important; display:flex !important; flex-direction:column !important; gap:6px !important;
+  background:var(--ow-sidebar) !important; color:#fff !important;
+}
+body.client #sidebarMenu .nav.flex-column{ gap:2px !important; }
+body.client #sidebarMenu .offcanvas-item{ border:0 !important; }
+body.client #sidebarMenu .offcanvas-item:first-child{ border:0 !important; }
+body.client #sidebarMenu .nav-link{
+  display:flex !important; align-items:center !important; gap:12px !important;
+  padding:10px 12px !important; margin:4px 6px !important; border-radius:12px !important;
+  color:#dbe3ff !important; text-decoration:none !important; font-weight:500 !important;
+}
+body.client #sidebarMenu .nav-link:hover{ background:rgba(255,255,255,.10) !important; color:#fff !important; }
+body.client #sidebarMenu .nav-link.is-active,
+body.client #sidebarMenu .nav-link.active,
+body.client #sidebarMenu .nav-link[aria-current="page"]{
+  background:#fff !important; color:#0d2a6b !important; font-weight:700 !important;
+}
+body.client #sidebarMenu .svg-icon{ width:20px !important; height:20px !important; fill:currentColor !important; color:currentColor !important; opacity:.95 !important; }
+
+/* (Optionnel) fond global + cartes KPI si tu les ajoutes plus tard */
+body.client{ background:var(--ow-bg) !important; }
+/* ======= NAVBAR -> SIDEBAR (sans changer le markup) ======= */
+:root{
+  --ow-sidebar:#0d2a6b;
+  --ow-sidebar-link:#dbe3ff;
+  --ow-sidebar-hover: rgba(255,255,255,.10);
+  --ow-active:#fff;
+}
+
+/* Mobile : on garde la navbar classique.
+   Desktop (>=md) : on épingle la navbar à gauche comme une sidebar. */
+@media (min-width: 768px){
+
+  /* Sidebar fixe */
+  body.client .navbar{
+    position: fixed !important;
+    top: 0; left: 0; bottom: 0;
+    width: 240px;
+    height: 100vh;
+    background: var(--ow-sidebar) !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 12px 8px !important;
+    z-index: 1030; /* au-dessus du contenu */
+  }
+
+  /* Décaler le contenu global pour ne pas passer sous la sidebar */
+  body.client{ padding-left: 240px !important; background:#f5f7fb; }
+
+  /* Brand en haut */
+  body.client .navbar .navbar-brand{
+    color: #fff !important;
+    margin: 8px 8px 12px 8px;
+    padding: 6px 8px;
+    font-weight: 700;
+  }
+
+  /* Empiler la nav verticalement */
+  body.client .navbar .navbar-collapse{
+    display: flex !important;
+    flex: 1 1 auto !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    overflow-y: auto;
+    gap: 4px;
+  }
+  body.client .navbar .navbar-nav{
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Liens du menu */
+  body.client .navbar .nav-link{
+    display: flex !important; align-items: center !important; gap: 10px !important;
+    color: var(--ow-sidebar-link) !important;
+    padding: 10px 12px !important; margin: 2px 6px !important;
+    border-radius: 12px !important; text-decoration: none !important;
+    font-weight: 500;
+  }
+  body.client .navbar .nav-link:hover{
+    background: var(--ow-sidebar-hover) !important; color: #fff !important;
+  }
+
+  /* Actif (fonctionne si Bootstrap pose .active, .show ou aria-current) */
+  body.client .navbar .nav-link.active,
+  body.client .navbar .nav-link[aria-current="page"],
+  body.client .navbar .nav-item.show > .nav-link{
+    background: var(--ow-active) !important; color: var(--ow-sidebar) !important; font-weight: 700 !important;
+  }
+
+  /* Dropdowns en mode vertical */
+  body.client .navbar .dropdown-menu{
+    position: static !important; /* intégré au flux vertical */
+    float: none !important;
+    display: none;               /* caché par défaut */
+    background: transparent !important;
+    border: 0 !important;
+    padding-left: 10px;
+  }
+  body.client .navbar .dropdown.show .dropdown-menu{ display: block !important; }
+  body.client .navbar .dropdown-item{
+    color: var(--ow-sidebar-link) !important;
+    border-radius: 10px;
+    padding: 8px 10px;
+  }
+  body.client .navbar .dropdown-item:hover{
+    background: var(--ow-sidebar-hover) !important; color:#fff !important;
+  }
+
+  /* Icônes inline (si vous avez des <svg> dans les liens) */
+  body.client .navbar .nav-link svg{
+    width: 20px; height: 20px; flex: 0 0 auto;
+    fill: currentColor; color: currentColor; opacity:.95;
+  }
+
+  /* Bouton burger inutile en desktop */
+  body.client .navbar .navbar-toggler{ display: none !important; }
+}
+
+/* Petites retouches mobile (navbar reste en haut) */
+@media (max-width: 767.98px){
+  body.client .navbar{ background: var(--ow-sidebar) !important; }
+  body.client .navbar .nav-link{ color:#fff !important; }
+}
+/* ===== Sidebar pour #sidebarMenu (sans changer le HTML) ===== */
+:root{
+  --ow-sidebar:#0d2a6b;             /* fond */
+  --ow-text:#dbe3ff;                /* liens */
+  --ow-hover:rgba(255,255,255,.10); /* hover */
+  --ow-active:#ffffff;              /* pastille active */
+}
+
+/* Desktop (>= md) : le offcanvas devient une colonne fixe à GAUCHE */
+@media (min-width: 768px){
+  #sidebarMenu.offcanvas-md.offcanvas-end{
+    position: fixed !important;
+    top: 0; left: 0; right: auto; bottom: 0;
+    width: 240px; height: 100vh;
+    transform: none !important;       /* visible, pas de slide */
+    visibility: visible !important;
+    background: var(--ow-sidebar) !important;
+    color: #fff !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    z-index: 1030;
+  }
+
+  /* décale le contenu principal pour ne pas passer dessous */
+  body{ padding-left: 240px !important; background:#f5f7fb; }
+
+  /* corps du menu */
+  #sidebarMenu .offcanvas-body{
+    padding: 14px 8px 18px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow-y: auto !important;
+    gap: 6px !important;
+    background: var(--ow-sidebar) !important;
+    color: #fff !important;
+  }
+
+  /* items / liste */
+  #sidebarMenu .offcanvas-item{ border:0 !important; }
+  #sidebarMenu .nav.flex-column{ gap: 2px !important; }
+
+  /* liens */
+  #sidebarMenu .nav-link{
+    display:flex !important; align-items:center !important; gap:10px !important;
+    padding:10px 12px !important; margin:4px 6px !important;
+    border-radius:12px !important; text-decoration:none !important;
+    color: var(--ow-text) !important; font-weight:500 !important;
+  }
+  #sidebarMenu .nav-link:hover{
+    background: var(--ow-hover) !important; color:#fff !important;
+  }
+
+  /* actif (.active / aria-current / classe utilitaire) */
+  #sidebarMenu .nav-link.active,
+  #sidebarMenu .nav-link[aria-current="page"],
+  #sidebarMenu .nav-link.is-active{
+    background: var(--ow-active) !important;
+    color: var(--ow-sidebar) !important;
+    font-weight:700 !important;
+  }
+
+  /* icônes */
+  #sidebarMenu .svg-icon{
+    width:20px !important; height:20px !important;
+    fill: currentColor !important; color: currentColor !important; opacity:.95 !important;
+  }
+
+  /* blocs solde / note */
+  #sidebarMenu h5.text-secondary{ color:#b9c7ff !important; font-weight:600 !important; }
+  #sidebarMenu h4, #sidebarMenu strong, #sidebarMenu span{ color:#fff !important; }
+}
+
+/* Mobile : on garde l’offcanvas Bootstrap à droite, juste couleurs */
+@media (max-width: 767.98px){
+  #sidebarMenu{ background: var(--ow-sidebar) !important; color:#fff !important; }
+  #sidebarMenu .nav-link{ color:#fff !important; }
+}
+@media (min-width: 768px){
+  #sidebarMenu .sidebar-brand{
+    display:flex; align-items:center; gap:10px;
+    border-bottom: 1px solid rgba(255,255,255,.15);
+    margin: 4px 6px 10px; border-radius:12px;
+  }
+  #sidebarMenu .sidebar-brand img{ display:block; }
+}
+/* ====== Sidebar FOSSBilling (mêmes styles que ton exemple) ====== */
+
+/* fond de page léger (optionnel) */
+body{ padding-top:0; background:#2451c814; }
+
+/* Desktop (>= md) : l’offcanvas devient une sidebar fixe à gauche */
+@media (min-width:768px){
+  #sidebarMenu.offcanvas-md.offcanvas-end{
+    position:fixed !important;
+    top:0; left:0; right:auto; bottom:0;
+    width:240px; height:100vh;
+    transform:none !important; visibility:visible !important; border:0 !important;
+    /* === fond identique à ton snippet === */
+    background:
+      linear-gradient(45deg, #0132b3, #3661d2),
+      url('/img/sidebar-bg.png');
+    background-size:cover;
+    background-blend-mode:overlay;
+    color:#fff !important;
+    z-index:1030;
+  }
+
+  /* décale le contenu pour ne pas passer dessous */
+  body{ padding-left:240px !important; }
+
+  /* conteneur interne */
+  #sidebarMenu .offcanvas-body{
+    background:transparent !important;
+    color:#fff !important;
+    overflow-y:auto !important;
+    padding:12px 8px 18px !important;
+  }
+
+  /* headings “sidebar-heading” -> on cible tes h5 existants */
+  #sidebarMenu .pt-3.ps-3 h5,
+  #sidebarMenu .sidebar-heading{
+    font-size:.75rem;
+    text-transform:uppercase;
+    font-weight:600;
+    margin:.75rem 0 .25rem;
+    color:rgba(255,255,255,.6);
+    padding-left:.25rem;
+  }
+
+  /* liste & items */
+  #sidebarMenu .nav.flex-column{ gap:4px !important; }
+  #sidebarMenu .offcanvas-item{ border:0 !important; }
+
+  /* liens (mêmes paddings/radius que ton exemple) */
+  #sidebarMenu .nav-link{
+    color:#fff !important;
+    border-radius:.5rem !important;
+    padding:.6rem 1rem !important;
+    transition:.2s ease-in-out;
+    display:flex; align-items:center; gap:.5rem;
+    text-decoration:none !important;
+  }
+
+  /* hover identique */
+  #sidebarMenu .nav-link:hover{
+    background:#fff !important;
+    color:#0132b3 !important;
+  }
+
+  /* actif identique (.active, aria-current, .is-active) */
+  #sidebarMenu .nav-link.active,
+  #sidebarMenu .nav-link[aria-current="page"],
+  #sidebarMenu .nav-link.is-active{
+    background:#fff !important;
+    color:#0132b3 !important;
+    font-weight:600 !important;
+  }
+
+  /* icônes : tes SVG et <i> éventuels */
+  #sidebarMenu .svg-icon{ width:20px; height:20px; fill:currentColor; color:currentColor; }
+  #sidebarMenu .nav-link i{ font-size:1rem; }
+}
+
+/* Mobile : on garde l’offcanvas natif, juste couleurs cohérentes */
+@media (max-width:767.98px){
+  #sidebarMenu{ 
+    background:
+      linear-gradient(45deg, #0132b3, #3661d2),
+      url('/img/sidebar-bg.png');
+    background-size:cover; background-blend-mode:overlay; color:#fff;
+  }
+  #sidebarMenu .nav-link{ color:#fff; }
+}
+@media (min-width: 768px) {
+    #sidebarMenu .offcanvas-item {
+        border: 0 !important;
+        border-radius: 15px !important;
+    }
+}
+.navbar-brand {display:none;}
+
+/* KPI style "carte blanche" */
+.kpi-grid { --kpi-radius:16px; --kpi-shadow:0 8px 18px rgba(13,71,255,.06); }
+.kpi-card{
+  background:#fff; border:1px solid var(--bs-border-color);
+  border-radius:var(--kpi-radius); box-shadow:var(--kpi-shadow);
+  padding:18px; display:flex; align-items:center; justify-content:space-between;
+}
+.kpi-meta{
+  display:flex; flex-direction:column; gap:2px;
+}
+.kpi-title{
+  font-size:.8rem; text-transform:uppercase; letter-spacing:.5px;
+  color:#6b7280; font-weight:600; margin:0;
+}
+.kpi-value{
+  font-size:2rem; line-height:1; font-weight:800; margin:2px 0 0 0;
+}
+.kpi-icon{
+  font-size:2rem; color:#0d47ff; /* bleu icône comme ta capture */
+  line-height:1; display:flex; align-items:center; justify-content:center;
+}
+.ow-grid.cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    min-height: 28rem;
+}

@@ -1,0 +1,352 @@
+{# =========================================================
+  MOD ORDERBUTTON (CLIENT) — Version OUITEMPLATE
+  - Forcé sur layout_default => chargement CSS/JS assuré
+  - Bandeau étapes (Choisir / Configurer / Payer)
+  - Styles 2025 encapsulés
+  - JS migré vers FOSS.api (pas de méthodes obsolètes)
+  ========================================================= #}
+
+{% extends "layout_default.html.twig" %}
+{% import "macro_functions.html.twig" as mf %}
+
+{# --------- Titres / Meta (FR) --------- #}
+{% block meta_title %}
+  {% if request.order matches '/^\\d+$/' %}
+    Configuration du produit
+  {% elseif request.checkout matches '/^\\d+$/' %}
+    Panier
+  {% else %}
+    Commander
+  {% endif %}
+{% endblock %}
+
+{% block body_class %}order-index{% endblock %}
+
+{% block page_header %}
+  {% if request.order matches '/^\\d+$/' %}
+    Configuration du produit
+  {% elseif request.checkout matches '/^\\d+$/' %}
+    Panier
+  {% else %}
+    Commander
+  {% endif %}
+{% endblock %}
+
+{% block page_subheader %}
+  {% if request.order matches '/^\\d+$/' %}
+    Paramétrez votre produit avant l’ajout au panier
+  {% elseif request.checkout matches '/^\\d+$/' %}
+    Vérifiez vos articles et procédez au paiement
+  {% else %}
+    Choisissez les produits que nous proposons à la vente
+  {% endif %}
+{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{{ 'order' | link}}">Commande</a></li>
+  {% if request.order matches '/^\\d+$/' %}
+    <li class="breadcrumb-item active" aria-current="page"><a href="#">Configuration</a></li>
+  {% elseif request.checkout matches '/^\\d+$/' %}
+    <li class="breadcrumb-item active" aria-current="page"><a href="#">Panier</a></li>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+
+{# --------- Styles 2025 --------- #}
+<style>
+  :root{
+    --ow-primary:#0d47ff; --ow-primary-600:#0b3fe0;
+    --ow-border: var(--bs-border-color, #e5e7eb);
+  }
+  .ow-wrap{display:flex;flex-direction:column;gap:18px}
+  .ow-card{background:#fff;border:1px solid var(--ow-border);border-radius:16px;box-shadow:0 8px 18px rgba(13,71,255,.06)}
+  .ow-hd{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--ow-border)}
+  .ow-hd h2{margin:0;font-size:1.05rem;font-weight:800}
+  .ow-bd{padding:18px}
+  .ow-side{position:sticky;top:82px}
+
+  .ow-steps{display:flex;gap:8px;align-items:center}
+  .ow-step{font-size:.85rem;padding:6px 10px;border-radius:999px;background:#f3f6ff;border:1px solid #e2e8ff;color:#2743f7;font-weight:600}
+  .ow-step.is-active{background:#2743f7;color:#fff;border-color:#2743f7}
+  .ow-step.is-dim{opacity:.65}
+
+  .btn-primary{background:var(--ow-primary);border-color:var(--ow-primary)}
+  .btn-primary:hover{background:var(--ow-primary-600);border-color:var(--ow-primary-600)}
+  .btn-outline-secondary:hover{background:#f8f9ff;border-color:#dbe5ff;color:#0d2a6b}
+
+  /* Skin “forte” pour uniformiser les sous-templates inclus */
+  body.order-index .ow-skin .card{
+    border-radius:16px !important;
+    border:1px solid var(--ow-border) !important;
+    box-shadow:0 8px 18px rgba(13,71,255,.06) !important;
+    overflow:hidden;
+  }
+  body.order-index .ow-skin .card-header{
+    padding:16px 18px !important;
+    border-bottom:1px solid var(--ow-border) !important;
+    background:#fff !important;
+  }
+  body.order-index .ow-skin .card-body{
+    padding:18px !important;
+    background:#fff !important;
+  }
+  body.order-index .ow-skin .list-group-item{
+    border:1px solid var(--ow-border) !important;
+    border-radius:12px !important;
+    margin-bottom:8px !important;
+  }
+  body.order-index .ow-skin .form-label{font-weight:600;margin-bottom:.35rem}
+  body.order-index .ow-skin .form-control,
+  body.order-index .ow-skin .form-select{
+    border-radius:12px !important; padding:.6rem .8rem !important;
+    border:1px solid var(--ow-border) !important;
+  }
+  body.order-index .ow-skin .input-group .form-control{border-radius:12px !important}
+  body.order-index .ow-skin .btn{border-radius:12px !important;font-weight:600 !important}
+
+  /* Tables panier relookées */
+  body.order-index .ow-skin table.table{
+    border-collapse:separate !important; border-spacing:0 6px !important;
+    background:transparent !important;
+  }
+  body.order-index .ow-skin table.table thead th{
+    font-size:.85rem; text-transform:uppercase; letter-spacing:.3px; color:#6b7280 !important;
+    border-bottom:1px solid var(--ow-border) !important;
+    background:#fff !important;
+  }
+  body.order-index .ow-skin table.table tbody tr{
+    background:#fff !important; border:1px solid var(--ow-border) !important;
+  }
+  body.order-index .ow-skin table.table tbody td{ border-top:0 !important; }
+
+  /* Encadrés auxiliaires */
+  #apply-promo, #register-or-login{
+    border:1px dashed var(--ow-border);border-radius:14px;padding:12px;background:#fff;
+  }
+
+  .ow-muted{color:#6b7280}
+  .ow-top-actions{display:flex;gap:8px;flex-wrap:wrap}
+</style>
+
+<div class="ow-wrap">
+
+  {# Bandeau étapes #}
+  <div class="ow-card">
+    <div class="ow-hd">
+      <h2>
+        {% if request.order matches '/^\\d+$/' %}Configuration du produit
+        {% elseif request.checkout matches '/^\\d+$/' %}Panier
+        {% else %}Commande{% endif %}
+      </h2>
+      <div class="ow-steps">
+        <span class="ow-step {% if not request.order and not request.checkout %}is-active{% else %}is-dim{% endif %}">1. Choisir</span>
+        <span class="ow-step {% if request.order matches '/^\\d+$/' %}is-active{% else %}is-dim{% endif %}">2. Configurer</span>
+        <span class="ow-step {% if request.checkout matches '/^\\d+$/' %}is-active{% else %}is-dim{% endif %}">3. Payer</span>
+      </div>
+    </div>
+    <div class="ow-bd ow-muted">
+      {% if request.order matches '/^\\d+$/' %}
+        Paramétrez votre produit avant l’ajout au panier.
+      {% elseif request.checkout matches '/^\\d+$/' %}
+        Vérifiez vos articles, appliquez un code promo puis procédez au paiement.
+      {% else %}
+        Choisissez les produits que nous proposons à la vente.
+      {% endif %}
+    </div>
+  </div>
+
+  {# ========= ÉTAPE 2 : CONFIGURER ========= #}
+  {% if request.order matches '/^\\d+$/' %}
+    <div class="ow-card">
+      <div class="ow-hd">
+        <h2>Paramètres du produit</h2>
+        <div class="ow-top-actions">
+          <a class="btn btn-outline-secondary btn-sm" href="{{ 'order'|link }}">⟵ Retour à la boutique</a>
+        </div>
+      </div>
+      <div class="ow-bd">
+        <div class="ow-skin">
+          {# Template officiel FOSSBilling — conserve la logique serveur #}
+          {% include 'mod_orderbutton_product_configuration.html.twig' %}
+        </div>
+      </div>
+    </div>
+
+  {# ========= ÉTAPE 3 : PAYER ========= #}
+  {% elseif request.checkout matches '/^\\d+$/' %}
+    <div class="row g-3">
+      <div class="col-12 col-lg-8">
+        <div class="ow-card">
+          <div class="ow-hd">
+            <h2>Votre panier</h2>
+            <div class="ow-top-actions">
+              <a class="btn btn-outline-secondary btn-sm" href="{{ 'order'|link }}">Continuer mes achats</a>
+            </div>
+          </div>
+          <div class="ow-bd">
+            <div class="ow-skin">
+              {% include 'mod_orderbutton_checkout.html.twig' %}
+            </div>
+          </div>
+        </div>
+
+        {% if not client %}
+          <div class="ow-card">
+            <div class="ow-hd"><h2>Se connecter ou créer un compte</h2></div>
+            <div class="ow-bd">
+              <div class="ow-skin">
+                {% include 'mod_orderbutton_client.html.twig' %}
+              </div>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="col-12 col-lg-4">
+        <div class="ow-card ow-side">
+          <div class="ow-hd"><h2>Récapitulatif</h2></div>
+          <div class="ow-bd">
+            <div class="ow-skin">
+              {# Récap simple ; les totaux s’affichent déjà dans mod_orderbutton_checkout.html.twig #}
+              <p class="text-muted mb-2">Les montants détaillés apparaissent dans le tableau du panier ci-contre.</p>
+              <div class="mt-3 d-grid">
+                <a href="#checkout-form" class="btn btn-primary">Procéder au paiement</a>
+              </div>
+              <p class="text-muted small mt-2 mb-0">Paiement sécurisé. Les moyens disponibles sont proposés à l’étape suivante.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  {# ========= ÉTAPE 1 : CHOISIR (fallback si arrivé ici) ========= #}
+  {% else %}
+    <div class="ow-card">
+      <div class="ow-hd"><h2>Boutique</h2></div>
+      <div class="ow-bd">
+        <p class="text-muted mb-3">Parcourez les catégories et choisissez un produit.</p>
+        <a href="{{ 'order'|link }}" class="btn btn-primary">Voir les catégories</a>
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{# --------- JS : migration vers FOSS.api --------- #}
+{% block js %}
+{% autoescape "js" %}
+<script>
+(function(){
+  // Helper pour messages
+  function toast(msg){ if(window.bb && bb.msg){ bb.msg(msg); } }
+
+  // Ajout au panier (form config produit)
+  document.addEventListener('submit', async function(e){
+    const form = e.target;
+    if(form && form.id === 'add-to-cart'){
+      e.preventDefault();
+      try{
+        const data = Object.fromEntries(new FormData(form).entries());
+        await FOSS.api('guest/cart/add_item', data);
+        toast("Produit ajouté au panier");
+        const url = "{{ 'orderbutton'|link({ 'checkout': 1 }) }}" + "{% if request.show_custom_form_values %}&show_custom_form_values=1{% endif %}";
+        window.location.href = url;
+      }catch(err){
+        console.error(err);
+        toast("Impossible d’ajouter au panier");
+      }
+    }
+  });
+
+  // Login
+  const loginForm = document.getElementById('client-login');
+  if(loginForm){
+    loginForm.addEventListener('submit', async function(e){
+      e.preventDefault();
+      try{
+        const data = Object.fromEntries(new FormData(loginForm).entries());
+        await FOSS.api('guest/client/login', data);
+        toast("Connexion réussie");
+        window.location.reload();
+      }catch(err){ console.error(err); toast("Échec de connexion"); }
+    });
+  }
+
+  // Création de compte
+  const regForm = document.getElementById('create-profile');
+  if(regForm){
+    regForm.addEventListener('submit', async function(e){
+      e.preventDefault();
+      try{
+        const data = Object.fromEntries(new FormData(regForm).entries());
+        await FOSS.api('guest/client/create', data);
+        // auto login
+        await FOSS.api('guest/client/login', { email: data.email, password: data.password });
+        toast("Compte créé et connecté");
+        window.location.reload();
+      }catch(err){ console.error(err); toast("Échec de création"); }
+    });
+  }
+
+  // Appliquer un code promo
+  const promoForm = document.getElementById('apply-promo');
+  if(promoForm){
+    promoForm.addEventListener('submit', async function(e){
+      e.preventDefault();
+      try{
+        const data = Object.fromEntries(new FormData(promoForm).entries());
+        await FOSS.api('guest/cart/apply_promo', data);
+        toast("Code promo appliqué");
+        window.location.reload();
+      }catch(err){ console.error(err); toast("Code promo invalide"); }
+    });
+  }
+
+  // Checkout
+  const checkoutForm = document.getElementById('checkout-form');
+  if(checkoutForm){
+    checkoutForm.addEventListener('submit', async function(e){
+      e.preventDefault();
+      try{
+        const data = Object.fromEntries(new FormData(checkoutForm).entries());
+        const result = await FOSS.api('client/cart/checkout', data);
+
+        if(result.invoice_hash){
+          const r = await FOSS.api('guest/invoice/payment', {
+            hash: result.invoice_hash,
+            gateway_id: result.gateway_id,
+            auto_redirect: true
+          });
+
+          if(r.iframe){
+            document.getElementById('payment-html-inner')?.insertAdjacentHTML('afterbegin', r.result || r);
+            document.getElementById('checkout')?.classList.add('d-none');
+            document.getElementById('payment-html')?.classList.remove('d-none');
+          }else{
+            const link = '{{ "invoice/banklink"|link }}' + '/' + result.invoice_hash + '/' + result.gateway_id;
+            window.location.href = link;
+          }
+        }else if(result.order_id){
+          window.location.href = '{{ "order/service/manage"|link }}' + '/' + result.order_id;
+        }else{
+          toast("Paiement initié");
+        }
+      }catch(err){ console.error(err); toast("Échec du paiement"); }
+    });
+  }
+
+  // Afficher champ promo
+  const showPromoBtn = document.getElementById('show-promo-field');
+  if(showPromoBtn){
+    showPromoBtn.addEventListener('click', function(){
+      const block = document.getElementById('apply-promo');
+      if(block){ block.style.display = 'block'; }
+      showPromoBtn.style.display = 'none';
+      document.getElementById('promocode')?.focus();
+    });
+  }
+})();
+</script>
+{% endautoescape %}
+{% endblock %}

@@ -1,0 +1,104 @@
+{# html_custom/mod_orderbutton_checkout_table.html.twig #}
+{# Affiche le contenu du panier avec un tableau moderne + bouton de suppression #}
+
+{% set cart = guest.cart_get %}
+
+{% if not cart.items or cart.items|length == 0 %}
+  <div class="alert alert-info mb-0">Votre panier est vide.</div>
+{% else %}
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead class="table-light">
+        <tr>
+          <th scope="col">Produit</th>
+          <th scope="col" class="text-center d-none d-md-table-cell">Période</th>
+          <th scope="col" class="text-end">Prix</th>
+          <th scope="col" class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for i, it in cart.items %}
+          <tr>
+            <td>
+              <div class="fw-bold">{{ it.title }}</div>
+              {% if it.description %}
+                <div class="text-muted small">{{ it.description|striptags }}</div>
+              {% endif %}
+            </td>
+            <td class="text-center d-none d-md-table-cell">
+              {# Affiche le code période si présent, sinon un tiret #}
+              {% if it.period %}{{ it.period }}{% else %}—{% endif %}
+            </td>
+            <td class="text-end">
+              {{ it.price | money_convert }}
+            </td>
+            <td class="text-end">
+              <button type="button"
+                      class="btn btn-sm btn-outline-danger js-remove-item"
+                      data-index="{{ i }}">
+                Retirer
+              </button>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        {% if cart.subtotal is defined %}
+          <tr>
+            <th colspan="2" class="text-end">Sous-total</th>
+            <th class="text-end">{{ cart.subtotal | money_convert }}</th>
+            <th></th>
+          </tr>
+        {% endif %}
+        {% if cart.discount is defined and cart.discount %}
+          <tr>
+            <th colspan="2" class="text-end">Remise</th>
+            <th class="text-end">-{{ cart.discount | money_convert }}</th>
+            <th></th>
+          </tr>
+        {% endif %}
+        {% if cart.tax is defined and cart.tax %}
+          <tr>
+            <th colspan="2" class="text-end">Taxes</th>
+            <th class="text-end">{{ cart.tax | money_convert }}</th>
+            <th></th>
+          </tr>
+        {% endif %}
+        <tr class="table-active">
+          <th colspan="2" class="text-end">Total</th>
+          <th class="text-end">
+            {{ (cart.total is defined ? cart.total : (cart.subtotal ?? 0)) | money_convert }}
+          </th>
+          <th></th>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+{% endif %}
+
+{# Actions JS (API moderne) #}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const api = (window.FOSSBilling && window.FOSSBilling.api) ? window.FOSSBilling.api() : null;
+  if (!api) {
+    console.warn('FOSSBilling.api() indisponible — vérifiez l’inclusion du bundle JS.');
+    return;
+  }
+
+  document.querySelectorAll('.js-remove-item').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const index = btn.getAttribute('data-index');
+      if (index === null) return;
+
+      try {
+        // API pour retirer un item du panier
+        await api.post('guest/cart/remove_item', { index: parseInt(index, 10) });
+        // Recharge la page / le widget du panier
+        window.location.reload();
+      } catch (e) {
+        alert(e?.message || 'Impossible de retirer cet article du panier.');
+      }
+    });
+  });
+});
+</script>

@@ -1,0 +1,196 @@
+{# html_custom/mod_orderbutton_checkout.html.twig #}
+
+{# === Styles compacts (optionnels) === #}
+<style>
+  .ow-card{background:#fff;border:1px solid var(--bs-border-color,#e5e7eb);border-radius:16px;box-shadow:0 8px 18px rgba(13,71,255,.06)}
+  .ow-hd{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--bs-border-color,#e5e7eb)}
+  .ow-hd h2{margin:0;font-size:1.05rem;font-weight:800}
+  .ow-bd{padding:18px}
+  .btn-primary{border-radius:12px}
+  .btn-outline-secondary{border-radius:12px}
+  .form-select, .form-control{border-radius:12px}
+</style>
+
+<div id="checkout" class="ow-card">
+  <div id="checkout-inner">
+  
+    <div class="ow-bd">
+      {# =========================
+         Tableau du panier
+         ========================= #}
+      {% if guest.system_template_exists({'file':'mod_orderbutton_checkout_table.html.twig'}) %}
+        {% include 'mod_orderbutton_checkout_table.html.twig' %}
+      {% else %}
+        {% set cart = guest.cart_get %}
+        {% if cart.items and cart.items|length %}
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Produit</th>
+                  <th class="text-end">Prix</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for it in cart.items %}
+                  <tr>
+                    <td>{{ it.title }}</td>
+                    <td class="text-end">{{ it.price | money_convert }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <th>Total</th>
+                  <th class="text-end">{{ cart.total | money_convert }}</th>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        {% else %}
+          <div class="text-muted">Votre panier est vide.</div>
+        {% endif %}
+      {% endif %}
+
+      <hr class="my-3">
+
+      {# =========================
+         Choix passerelle + Checkout
+         ========================= #}
+      <form id="checkout-form" onsubmit="return false;">
+        <input type="hidden" name="CSRFToken" value="{{ CSRFToken }}">
+
+        {# Récupère les passerelles disponibles côté client #}
+        {% set gateways = guest.invoice_gateways({'format':'pairs'}) %}
+        {% if gateways and gateways|length > 0 %}
+          <div class="mb-3">
+            {% if gateways|length > 1 %}
+              <label class="form-label">Moyen de paiement</label>
+              <select name="gateway_id" id="gateway_id" class="form-select" required>
+                {% for gid, gname in gateways %}
+                  <option value="{{ gid }}">{{ gname }}</option>
+                {% endfor %}
+              </select>
+            {% else %}
+              {% for gid, gname in gateways %}
+                <input type="hidden" name="gateway_id" value="{{ gid }}">
+                <div class="small text-muted">Paiement via <strong>{{ gname }}</strong></div>
+              {% endfor %}
+            {% endif %}
+          </div>
+        {% else %}
+          <div class="alert alert-warning">
+            Aucune méthode de paiement n’est disponible. Activez et configurez au moins une passerelle (ex. Stripe) dans l’admin.
+          </div>
+        {% endif %}
+
+        <div class="d-flex gap-2 justify-content-end">
+          <a href="{{ 'order'|link }}" class="btn btn-outline-secondary">Continuer mes achats</a>
+          <button type="submit" class="btn btn-primary">Payer maintenant</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# Conteneur d’affichage du HTML de la passerelle (redirection / iframe) #}
+<div id="payment-html" style="display:none;" class="ow-card mt-3">
+  <div class="ow-hd"><h2>Paiement</h2></div>
+  <div id="payment-html-inner" class="ow-bd"></div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const api = (window.FOSSBilling && window.FOSSBilling.api) ? window.FOSSBilling.api() : null;
+  if (!api) {
+    console.warn('FOSSBilling.api() indisponible — vérifiez l’inclusion du bundle JS du thème.');
+    return;
+  }
+
+  const form   = document.getElementById('checkout-form');
+  const payUI  = document.getElementById('payment-html');
+  const payIn  = document.getElementById('payment-html-inner');
+  const wrap   = document.getElementById('checkout');
+  const inner  = document.getElementById('checkout-inner');
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    try {
+      const fd = new FormData(form);
+      const payload = Object.fromEntries(fd.entries());
+
+      // Étape 1 : checkout -> création/validation et récupération invoice_hash
+      const res = await api.post('client/cart/checkout', payload);
+
+      if (!res || !res.invoice_hash) {
+        throw new Error("Le serveur n'a pas renvoyé d'`invoice_hash`.");
+      }
+
+      // Sauvegarde pour un retry si besoin
+      sessionStorage.setItem('last_invoice_hash', res.invoice_hash);
+
+      // Étape 2 : lancer le paiement
+      const gatewayId = payload.gateway_id || res.gateway_id || null;
+      const payRes = await api.post('guest/invoice/payment', {
+        hash: res.invoice_hash,
+        gateway_id: gatewayId,
+        auto_redirect: true
+      });
+
+      if (payRes && payRes.iframe) {
+        // Affiche l’HTML/iframe retourné
+        payIn.innerHTML = payRes.result || '';
+        wrap.style.display = 'none';
+        if (inner) inner.remove();
+        payUI.style.display = 'block';
+      } else {
+        // Redirection classique
+        const link = '{{ "invoice/banklink"|link }}' + '/' + res.invoice_hash + '/' + (gatewayId || '');
+        payIn.innerHTML = '<a href="'+link+'" target="_parent" id="redirect-to-gateway">Redirection vers le paiement…</a>';
+        wrap.style.display = 'none';
+        if (inner) inner.remove();
+        payUI.style.display = 'block';
+        document.getElementById('redirect-to-gateway')?.click();
+      }
+    } catch (err) {
+      alert(err?.message || 'Erreur pendant le paiement');
+
+      // Proposer de retenter avec la dernière facture (le panier peut être vidé après checkout)
+      const last = sessionStorage.getItem('last_invoice_hash');
+      if (last && payUI && payIn && wrap) {
+        payIn.innerHTML = `
+          <div class="alert alert-danger">Le paiement n'a pas abouti.</div>
+          <div class="mb-2">Vous pouvez retenter le paiement sur la facture créée.</div>
+          <div class="d-flex gap-2">
+            <button type="button" id="retry-pay" class="btn btn-primary btn-sm">Réessayer le paiement</button>
+            <a class="btn btn-outline-secondary btn-sm" href="{{ 'invoice'|link }}">Voir mes factures</a>
+          </div>
+        `;
+        wrap.style.display = 'none';
+        if (inner) inner.remove();
+        payUI.style.display = 'block';
+
+        document.getElementById('retry-pay')?.addEventListener('click', async () => {
+          try {
+            const gtw = (document.getElementById('gateway_id')?.value) || null;
+            const rep = await api.post('guest/invoice/payment', {
+              hash: last,
+              gateway_id: gtw,
+              auto_redirect: true
+            });
+            if (rep?.iframe) {
+              payIn.innerHTML = rep.result || '';
+            } else {
+              const link = '{{ "invoice/banklink"|link }}' + '/' + last + '/' + (gtw || '');
+              window.location.href = link;
+            }
+          } catch (e2) {
+            alert(e2?.message || 'Nouvelle erreur de paiement');
+          }
+        });
+      }
+    }
+  });
+});
+</script>

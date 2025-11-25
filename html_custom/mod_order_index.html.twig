@@ -1,0 +1,154 @@
+{% extends request.ajax ? "layout_blank.html.twig" : "layout_default.html.twig" %}
+{% import "macro_functions.html.twig" as mf %}
+
+{# Catégories + paramètre ?cat=ID #}
+{% set categories = guest.product_category_get_list.list %}
+{% set sel = request.cat|default(null) %}
+{% set chosen = null %}
+{% if sel and categories %}
+  {% for c in categories %}
+    {% if (sel ~ '') == (c.id ~ '') %}
+      {% set chosen = c %}
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
+{% block meta_title %}{{ chosen ? 'Choisir un produit'|trans : 'Commander'|trans }}{% endblock %}
+{% block body_class %}order-index{% endblock %}
+
+{% block breadcrumbs %}
+<div class="mb-1">
+  <ol class="breadcrumb" aria-label="breadcrumbs">
+    <li class="breadcrumb-item"><a href="{{ '/'|link }}">{{ 'Home'|trans }}</a></li>
+    <li class="breadcrumb-item"><a href="{{ 'order'|link }}">{{ 'Order'|trans }}</a></li>
+    {% if chosen %}
+      <li class="breadcrumb-item active" aria-current="page">{{ chosen.title }}</li>
+    {% else %}
+      <li class="breadcrumb-item active" aria-current="page">De quel service avez-vous besoin&nbsp;?</li>
+    {% endif %}
+  </ol>
+</div>
+{% endblock %}
+
+{% block page_header %}{{ chosen ? 'Select Product'|trans : 'De quel service avez-vous besoin ?' }}{% endblock %}
+{% block page_subheader %}{{ chosen ? 'Choose a product to continue to configuration'|trans : 'Choisissez une catégorie pour voir les produits disponibles'|trans }}{% endblock %}
+
+{% block content %}
+<style>
+  .ow-card{background:#fff;border:1px solid var(--bs-border-color,#e5e7eb);border-radius:16px;box-shadow:0 8px 18px rgba(13,71,255,.06);padding:18px;margin-bottom:16px}
+  .ow-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+  .ow-header h2{margin:0;font-size:1.15rem;font-weight:800}
+  .ow-desc{color:#6b7280;margin-bottom:8px}
+
+  .ow-grid{display:grid;gap:14px}
+  .ow-grid.cols-1{grid-template-columns:repeat(1,minmax(0,1fr))}
+  .ow-grid.cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ow-grid.cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .ow-grid.cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+  @media (max-width:1200px){.ow-grid.cols-4{grid-template-columns:repeat(3,1fr)}}
+  @media (max-width:992px){ .ow-grid.cols-4,.ow-grid.cols-3{grid-template-columns:repeat(2,1fr)}}
+  @media (max-width:576px){ .ow-grid.cols-4,.ow-grid.cols-3,.ow-grid.cols-2{grid-template-columns:1fr}}
+
+  .cat-card{display:flex;align-items:center;gap:12px;padding:16px;border:1px solid var(--bs-border-color,#e5e7eb);border-radius:14px;background:#fff;text-decoration:none;color:inherit;transition:.18s}
+  .cat-card:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(13,71,255,.10);border-color:#dbe5ff;background:#f8faff}
+  .cat-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:#eef3ff}
+  .cat-icon i{font-size:1.1rem;color:#0d47ff}
+  .cat-title{margin:0;font-weight:800}
+  .cat-count{font-size:.9rem;color:#6b7280}
+
+  .prod-card{border:1px solid var(--bs-border-color,#e5e7eb);border-radius:16px;background:#fff;box-shadow:0 6px 16px rgba(13,71,255,.05);transition:.18s;display:flex;flex-direction:column}
+  .prod-card:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(13,71,255,.10);border-color:#dbe5ff}
+  .prod-body{padding:16px;display:flex;flex-direction:column;height:100%}
+  .prod-type{text-transform:uppercase;letter-spacing:.4px;font-weight:700;font-size:.75rem;color:#64748b}
+  .prod-title{margin:6px 0 2px 0;font-weight:800;font-size:1.05rem}
+  .prod-desc{color:#6b7280;font-size:.95rem}
+  .prod-footer{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:10px}
+
+  .btn-primary{background:#0d47ff;border-color:#0d47ff}
+  .btn-primary:hover{background:#0b3fe0;border-color:#0b3fe0}
+  .btn-outline-secondary:hover{background:#f8f9ff;border-color:#dbe5ff;color:#0d2a6b}
+</style>
+
+{% macro cols_class(n) %}
+  {%- set n = n|default(0) -%}
+  {%- set c = 1 -%}
+  {%- if n >= 4 -%}{% set c = 4 %}
+  {%- elseif n == 3 -%}{% set c = 3 %}
+  {%- elseif n == 2 -%}{% set c = 2 %}
+  {%- elseif n == 1 -%}{% set c = 1 %}
+  {%- else -%}{% set c = 1 %}{% endif -%}
+  {{- 'cols-' ~ c -}}
+{% endmacro %}
+{% import _self as util %}
+
+{# ===== PRODUITS d’une catégorie sélectionnée ===== #}
+{% if chosen %}
+  {% set prods = (chosen.products|default([]))|sort((a,b) => a.priority <=> b.priority) %}
+  <div class="ow-card">
+    <div class="ow-header">
+      <h2>{{ chosen.title }}</h2>
+      <a class="btn btn-sm btn-outline-secondary" href="{{ 'order'|link }}">⟵ Toutes les catégories</a>
+    </div>
+    {% if chosen.description %}<div class="ow-desc">{{ chosen.description|markdown }}</div>{% endif %}
+
+    {% if not prods or prods|length == 0 %}
+      <div class="text-muted">Aucun produit dans cette catégorie.</div>
+    {% else %}
+      <div class="ow-grid {{ util.cols_class(prods|length) }}">
+        {% for product in prods %}
+          <div class="prod-card">
+            <div class="prod-body">
+              <div class="prod-type">{{ product.type }}</div>
+              <div class="prod-title">{{ product.title }}</div>
+              {% if product.description %}
+                <div class="prod-desc mt-1">{{ product.description|striptags|truncate(160) }}</div>
+              {% endif %}
+              <div class="prod-footer pt-2">
+                <div class="price"></div>
+                {# >>> ICI : bouton CONFIGURER va vers la PAGE DE CONFIGURATION <<< #}
+                <a href="{{ 'orderbutton'|link({ 'order': product.id }) }}"
+                   class="btn btn-primary">
+                  Configurer
+                </a>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+
+{# ===== LISTE DES CATÉGORIES ===== #}
+{% else %}
+  {% set cat_count = categories ? categories|length : 0 %}
+  <div class="ow-card">
+    <div class="ow-header"><h2>De quel service avez-vous besoin&nbsp;?</h2></div>
+
+    {% if not categories or categories|length == 0 %}
+      <div class="text-muted">Aucune catégorie disponible.</div>
+    {% else %}
+      <div class="ow-grid {{ util.cols_class(cat_count) }}">
+        {% for cat in categories %}
+          {% set title_lc = (cat.title|lower) %}
+          {% set icon = 'bi-box' %}
+          {% if 'domaine' in title_lc or 'domain' in title_lc %}{% set icon = 'bi-globe' %}{% endif %}
+          {% if 'hébergement' in title_lc or 'hosting' in title_lc %}{% set icon = 'bi-hdd-network' %}{% endif %}
+          {% if 'serveur' in title_lc or 'vps' in title_lc %}{% set icon = 'bi-cpu' %}{% endif %}
+          {% if 'email' in title_lc or 'mail' in title_lc %}{% set icon = 'bi-envelope-paper' %}{% endif %}
+
+          <a class="cat-card" href="{{ 'order'|link }}?cat={{ cat.id }}">
+            <div class="cat-icon"><i class="bi {{ icon }}"></i></div>
+            <div class="flex-grow-1">
+              <p class="cat-title">{{ cat.title }}</p>
+              <div class="cat-count">{{ (cat.products|default([]))|length }} produit(s)</div>
+              {% if cat.description %}
+                <div class="text-muted small mt-1">{{ cat.description|striptags|truncate(120) }}</div>
+              {% endif %}
+            </div>
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}

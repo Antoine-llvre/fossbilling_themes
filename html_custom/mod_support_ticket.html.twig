@@ -1,0 +1,208 @@
+{% extends request.ajax ? "layout_blank.html.twig" : "layout_default.html.twig" %}
+{% import "macro_functions.html.twig" as mf %}
+
+{% block meta_title %}{{ ticket.subject }}{% endblock %}
+{% block body_class %}support-ticket{% endblock %}
+
+{% block head %}
+  {{ encore_entry_link_tags('markdown') }}
+  {{ mf.wysiwyg('.editor-textarea') }}
+  <style>
+    :root{ --ow-border: var(--bs-border-color,#e5e7eb); --ow-shadow:0 8px 18px rgba(13,71,255,.06) }
+    .ow-card{background:#fff;border:1px solid var(--ow-border);border-radius:16px;box-shadow:var(--ow-shadow);overflow:hidden}
+    .ow-hd{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--ow-border)}
+    .ow-hd h2{margin:0;font-size:1.05rem;font-weight:800}
+    .ow-bd{padding:18px}
+    .btn{border-radius:12px;font-weight:600}
+    .form-control,.form-select,.editor-textarea{border-radius:12px}
+    .badge.round{border-radius:999px}
+    .msg-card{border:1px solid var(--ow-border);border-radius:16px;box-shadow:var(--ow-shadow)}
+    .msg-op{border-color:#cfe4ff}
+    .msg-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--ow-border);background:#fff}
+    .msg-body{padding:16px}
+    .markdown-body{background:transparent}
+    .author{display:flex;align-items:center;gap:12px}
+    .author .who{display:flex;flex-direction:column}
+    .meta{color:#6b7280;font-size:.85rem}
+  </style>
+{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{{ 'support'|link }}">{{ 'Support tickets'|trans }}</a></li>
+  <li class="breadcrumb-item active" aria-current="page">{{ ticket.subject }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="ow-card mb-3">
+      <div class="ow-hd">
+        <div>
+          <h2>{{ 'Ticket'|trans }} #{{ ticket.id }}</h2>
+          <div class="meta">
+            {{ 'Help desk'|trans }} · {{ ticket.helpdesk.name }}
+            &nbsp;•&nbsp;
+            {{ 'Status'|trans }} :
+            <span class="badge round
+              {% if ticket.status == 'open' %} bg-success
+              {% elseif ticket.status == 'on_hold' %} bg-warning text-dark
+              {% else %} bg-secondary {% endif %}">
+              {{ mf.status_name(ticket.status) }}
+            </span>
+            &nbsp;•&nbsp; {{ 'Time opened'|trans }} {{ ticket.created_at|format_date }}
+            {% if ticket.rel_type == 'order' and ticket.rel_id %}
+              &nbsp;•&nbsp; {{ 'Related to'|trans }}
+              <a href="{{ 'order/service/manage'|link }}/{{ ticket.rel_id }}">{{ 'Service #'|trans }}{{ ticket.rel_id }}</a>
+            {% endif %}
+          </div>
+        </div>
+        <div class="d-flex gap-2">
+          {% if (ticket.status != 'closed') or (ticket.helpdesk.can_reopen) %}
+            <button class="btn btn-outline-primary btn-sm" id="reply-to-btn">
+              <i class="bi bi-reply me-1"></i>{{ 'Reply'|trans }}
+            </button>
+          {% endif %}
+          {% if ticket.status != 'closed' %}
+            <button class="btn btn-outline-secondary btn-sm" type="button" id="ticket-close">
+              {{ 'Close ticket'|trans }}
+            </button>
+          {% endif %}
+        </div>
+      </div>
+      <div class="ow-bd">
+        <div class="d-flex flex-column gap-3">
+          {% for i, message in ticket.messages %}
+            <div class="msg-card {% if message.admin_id %}msg-op{% endif %}">
+              <div class="msg-head">
+                <div class="author">
+                  <img src="{{ message.author.email|gravatar(40) }}" alt="{{ message.author.name }}" class="rounded d-none d-md-block" width="40" height="40">
+                  <div class="who">
+                    <strong class="text-muted">{{ message.author.name }}</strong>
+                    {% if message.admin_id %}
+                      <span class="badge round bg-primary">{{ 'Operator'|trans }}</span>
+                    {% else %}
+                      <span class="badge round bg-secondary">{{ 'You'|trans }}</span>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="d-flex align-items-center gap-3">
+                  <span class="meta">#{{ message.id }} · {{ message.created_at|format_date }}</span>
+                  {% if (ticket.status != 'closed') or (ticket.helpdesk.can_reopen) %}
+                    <button class="btn btn-sm btn-outline-secondary btn-quote-reply"
+                            message-quote="{{ mf.markdown_quote(message.content) }}"
+                            data-bs-toggle="tooltip" data-bs-title="{{ 'Quote reply'|trans }}">
+                      <i class="bi bi-chat-left-quote"></i>
+                    </button>
+                  {% endif %}
+                </div>
+              </div>
+              <div class="msg-body">
+                <article class="markdown-body" id="message-{{ message.id }}">
+                  {{ message.content|markdown }}
+                </article>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+
+        <div class="mt-4">
+          {% if ticket.status == 'closed' and not ticket.helpdesk.can_reopen %}
+            <div class="alert alert-secondary text-center mb-0">{{ 'Ticket was closed and cannot be reopened.'|trans }}</div>
+          {% else %}
+            {% if ticket.status == 'closed' %}
+              <div class="alert alert-secondary text-center">{{ 'This ticket was closed, but you can still reopen it by replying.'|trans }}</div>
+            {% endif %}
+            <div class="ow-card" id="reply-to">
+              <div class="ow-bd">
+                <form id="ticket-reply-form">
+                  <input type="hidden" name="CSRFToken" value="{{ CSRFToken }}"/>
+                  <input type="hidden" name="id" value="{{ ticket.id }}">
+                  <label for="ticket-reply-text" class="form-label fw-bold">{{ 'Your message'|trans }}</label>
+                  <textarea name="content" cols="5" rows="8" class="editor-textarea form-control" required id="ticket-reply-text"></textarea>
+                  <div class="d-flex justify-content-end gap-2 mt-3">
+                    {% if ticket.status != 'closed' %}
+                      <button class="btn btn-outline-secondary" type="button" id="ticket-close">{{ 'Close ticket'|trans }}</button>
+                    {% endif %}
+                    <button class="btn btn-primary" type="submit" id="post-reply-btn">
+                      {{ 'Post'|trans }}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block js %}
+{% autoescape "js" %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  // API moderne
+  const api = (window.FOSSBilling && window.FOSSBilling.api) ? window.FOSSBilling.api() : null;
+
+  const ticketReplyForm = document.getElementById('ticket-reply-form');
+  const closeTicketBtn  = document.getElementById('ticket-close');
+  const postReplyBtn    = document.getElementById('post-reply-btn');
+  const replyToBtns     = document.querySelectorAll('.btn-quote-reply');
+  const replyTextarea   = document.getElementById('ticket-reply-text');
+  const focusReplyBtn   = document.getElementById('reply-to-btn');
+
+  // Quote
+  replyToBtns.forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const quote = btn.getAttribute('message-quote') || '';
+      replyTextarea.value = (quote || '').replace(/^\s*$(?:\r\n?|\n)/gm, '');
+      replyTextarea.focus();
+    });
+  });
+
+  // Focus sur le formulaire
+  if (focusReplyBtn) {
+    focusReplyBtn.addEventListener('click', () => replyTextarea && replyTextarea.focus());
+  }
+
+  // Réponse au ticket
+  if (ticketReplyForm && api) {
+    ticketReplyForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(ticketReplyForm).entries());
+      if (!data.content) {
+        (window.FOSSBilling?.message || alert)("{{ 'Please fill all required fields'|trans }}");
+        return;
+      }
+      try {
+        // Endpoint côté client
+        await api.post('client/support/ticket_reply', data);
+        (window.FOSSBilling?.message || alert)("{{ 'Posted reply'|trans }}");
+        window.location.reload();
+      } catch (err) {
+        (window.FOSSBilling?.message || alert)((err?.message || 'Error') + (err?.code ? ' ('+err.code+')' : ''), "error");
+      }
+    });
+  }
+
+  // Fermeture
+  if (closeTicketBtn && api) {
+    closeTicketBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(ticketReplyForm).entries());
+      try {
+        await api.post('client/support/ticket_close', data);
+        (window.FOSSBilling?.message || alert)("{{ 'Closed ticket'|trans }} #{{ ticket.id }}");
+        window.location.reload();
+      } catch (err) {
+        (window.FOSSBilling?.message || alert)((err?.message || 'Error') + (err?.code ? ' ('+err.code+')' : ''), "error");
+      }
+    });
+  }
+});
+</script>
+{% endautoescape %}
+{% endblock %}

@@ -1,0 +1,159 @@
+{% extends "layout_public.html.twig" %}
+
+{% set company = guest.system_company %}
+
+{% if settings.theme == 'dark' %}
+    {% set logo_url =  company.logo_url_dark %}
+{% else %}
+    {% set logo_url =  company.logo_url %}
+{% endif %}
+
+{% block meta_title %}{{ 'Login'|trans }}{% endblock %}
+{% block body_class %}page-login{% endblock %}
+
+{% block body %}
+
+<style>
+    /* Layout général */
+    .page-login .login-left {
+        background: url('https://manager.ouioweb.com/img/computer.jpg') center center no-repeat;
+        background-size: cover;
+        position: relative;
+        color: #fff;
+    }
+    .page-login .login-left::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4); /* overlay foncé pour le contraste */
+    }
+    .page-login .login-left .overlay-text {
+        position: absolute;
+        bottom: 2rem;
+        left: 2rem;
+        right: 2rem;
+        z-index: 1;
+    }
+    .page-login .login-left h2 {
+        font-weight: 700;
+    }
+
+    .page-login .login-form {
+        max-width: 400px;
+        margin: auto;
+        padding: 2rem;
+    }
+
+    .page-login .form-control:focus {
+        border-color: #3B5BFF;
+        box-shadow: 0 0 0 .25rem rgba(59, 91, 255, .25);
+    }
+
+    .page-login .btn-primary {
+        background: #3B5BFF;
+        border-color: #3B5BFF;
+    }
+
+    .page-login .btn-primary:hover {
+        background: #324ecc;
+        border-color: #324ecc;
+    }
+    .h-100 {
+    min-height: 100vh;
+}
+</style>
+
+<div class="container-fluid min-vh-100">
+    <div class="row h-100">
+
+        {# Colonne gauche : image + texte (desktop uniquement) #}
+        <div class="col-md-6 d-none d-md-block login-left">
+            <div class="overlay-text">
+                <h2>Bienvenue sur Ouioweb</h2>
+                <p class="mb-0">
+                    Gérez vos sites web, domaines, et autres produits. <br>Dites oui à votre présente en ligne avec Ouioweb
+                </p>
+            </div>
+        </div>
+
+        {# Colonne droite : logo (visible aussi sur mobile) + formulaire #}
+        <div class="col-md-6 d-flex align-items-center justify-content-center">
+            <div class="login-form w-100">
+
+                <div class="text-center mb-4">
+                    <img src="https://manager.ouioweb.com/img/logo.svg" alt="Ouioweb" style="max-width:300px;" class="mb-3">
+                </div>
+
+                <form
+                    class="api-form auth"
+                    action="{{ 'api/guest/client/login'|link }}"
+                    method="post"
+                    data-api-redirect="{{ redirect_uri|default('/')|link }}"
+                >
+                    <div class="mb-3">
+                        <label class="form-label" for="email">{{ 'Email'|trans }}</label>
+                        <input
+                            class="form-control form-control-lg"
+                            id="email"
+                            type="text"
+                            placeholder="{{ 'Enter your email address'|trans }}"
+                            name="email"
+                            value="{{ request.email }}"
+                            required="required"
+                            autofocus
+                        >
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="password">{{ 'Password'|trans }}</label>
+                        <input
+                            class="form-control form-control-lg"
+                            id="password"
+                            type="password"
+                            placeholder="{{ 'Enter your password'|trans }}"
+                            name="password"
+                            required="required"
+                            value="{{ request.password }}"
+                        >
+                    </div>
+                    <div class="d-grid mb-3">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            {{ 'Login'|trans }}
+                        </button>
+                    </div>
+                </form>
+
+                {% if settings.show_password_reset_link or settings.show_signup_link %}
+                    <div class="row mt-2">
+                        {% if settings.show_signup_link %}
+                            <div class="col-12 col-md-12 mb-2"><center><p>OU</p></center>
+                                
+                                <a class="btn btn-outline-primary w-100" href="{{ 'signup'|link }}">
+                                    {{ 'Create account'|trans }}
+                                </a>
+                            </div>
+                        {% endif %}
+                        {% if settings.show_password_reset_link %}
+                            <div class="col-12 col-md-12 mb-2">
+                                <br>
+                               <center> <a class=" w-100" href="{{ 'password-reset'|link }}"  style="
+    text-decoration: none;
+    color: #56595c;
+">
+                                    {{ 'Forgot password?'|trans }}
+                                </a></center>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endif %}
+
+                <p class="text-center text-muted small mt-4 mb-0">
+                    © {{ "now"|date("Y") }} Ouioweb
+                </p>
+
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}

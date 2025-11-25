@@ -1,0 +1,84 @@
+{# themes/ouioweb/html/mod_index_index.html.twig #}
+{% extends "layout_public.html.twig" %}
+
+{% set company = guest.system_company %}
+
+{% block meta_title %}{{ 'Bienvenue chez %s'|trans|format(company.name) }}{% endblock %}
+{% block body_class %}page-home{% endblock %}
+
+{% block body %}
+<div class="container my-5">
+
+    {# HERO #}
+    <div class="row align-items-center mb-5">
+        <div class="col-md-7">
+            <h1 class="display-5 fw-bold mb-3">
+                {{ company.name }} – votre hébergeur & services web
+            </h1>
+            <p class="lead mb-4">
+                Gérez vos hébergements, domaines, factures et tickets d’assistance depuis un espace client simple et moderne.
+            </p>
+            <div class="d-flex gap-3 flex-wrap">
+                <a href="{{ 'client/login'|link }}" class="btn btn-primary btn-lg">
+                    {{ 'Se connecter'|trans }}
+                </a>
+                <a href="{{ 'client/signup'|link }}" class="btn btn-outline-secondary btn-lg">
+                    {{ 'Créer un compte'|trans }}
+                </a>
+            </div>
+        </div>
+        <div class="col-md-5 mt-4 mt-md-0 text-md-end text-center">
+            {# Tu peux mettre une image marketing ici #}
+            <img src="/themes/ouioweb/assets/img/dashboard-illu.svg"
+                 alt="{{ company.name }}"
+                 class="img-fluid rounded-3 shadow-sm">
+        </div>
+    </div>
+
+    {# BLOCS D’ACCÈS RAPIDES #}
+    <div class="row gy-4">
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="card-body">
+                    <h3 class="h5 mb-3">Espace client</h3>
+                    <p class="text-muted mb-3">
+                        Consultez vos services, factures et moyens de paiement en quelques clics.
+                    </p>
+                    <a href="{{ 'client/login'|link }}" class="btn btn-sm btn-primary">
+                        Accéder à mon compte
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="card-body">
+                    <h3 class="h5 mb-3">Commander</h3>
+                    <p class="text-muted mb-3">
+                        Hébergement web, noms de domaine, emails pro… découvrez nos offres.
+                    </p>
+                    <a href="{{ 'order'|link }}" class="btn btn-sm btn-outline-primary">
+                        Voir les offres
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="card-body">
+                    <h3 class="h5 mb-3">Support & actualités</h3>
+                    <p class="text-muted mb-3">
+                        Suivez les annonces importantes et contactez notre support en cas de besoin.
+                    </p>
+                    <a href="{{ 'announcements'|link }}" class="btn btn-sm btn-outline-secondary">
+                        Voir les annonces
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

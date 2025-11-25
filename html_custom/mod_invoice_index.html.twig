@@ -1,0 +1,196 @@
+{% extends request.ajax ? "layout_blank.html.twig" : "layout_default.html.twig" %}
+
+{% block meta_title %}{{ 'Invoice management'|trans }}{% endblock %}
+{% block body_class %}invoice-index{% endblock %}
+{% block breadcrumb %}
+  <li class="breadcrumb-item active" aria-current="page">{{ 'Invoices'|trans }}</li>
+{% endblock %}
+
+{# ========= DATA (on charge d’abord pour éviter d’appeler avant définition) ========= #}
+{% set unpaid_invoices = client.invoice_get_list({"status":"unpaid", "per_page":10, "page":request.page}) %}
+{% set paid_invoices   = client.invoice_get_list({"status":"paid",   "per_page":10, "page":request.page}) %}
+
+{% block content %}
+
+{# ========= Styles “2025” full white ========= #}
+<style>
+  :root{
+    --ow-border: var(--bs-border-color, #e5e7eb);
+    --ow-soft: 0 10px 26px rgba(13,71,255,.08);
+  }
+  body.invoice-index .card{ background:#fff !important; border:1px solid var(--ow-border) !important; border-radius:18px; box-shadow:var(--ow-soft) }
+  body.invoice-index .card-header{ background:#fff !important; border-bottom:1px solid var(--ow-border) !important; }
+  body.invoice-index .card-body{ background:#fff !important; }
+
+  .ow-h1{font-weight:800;margin:0}
+  .ow-sub{color:#6b7280}
+
+  .nav-tabs .nav-link{border:0; border-bottom:2px solid transparent; font-weight:700; border-radius:0; padding:.75rem 1rem}
+  .nav-tabs .nav-link.active{border-bottom-color:#0d47ff; color:#0d47ff}
+
+  .table-modern{border-collapse:separate;border-spacing:0 6px}
+  .table-modern thead th{position:sticky;top:0;background:#fff;z-index:2;border-bottom:1px solid var(--ow-border)!important}
+  .table-modern tbody tr{background:#fff; box-shadow:var(--ow-soft)}
+  .table-modern tbody td{border-top:0!important; background:#fff}
+  .cell{padding:12px 16px;border-top:1px solid var(--ow-border);border-bottom:1px solid var(--ow-border)}
+  .cell:first-child{border-left:1px solid var(--ow-border);border-top-left-radius:12px;border-bottom-left-radius:12px}
+  .cell:last-child{border-right:1px solid var(--ow-border);border-top-right-radius:12px;border-bottom-right-radius:12px}
+
+  .inv-id{font-family:ui-monospace, Menlo, Consolas, monospace; color:#64748b; font-size:.9rem}
+  .badge-danger{border-radius:999px}
+  .badge-secondary{border-radius:999px}
+
+  @media (max-width: 768px){
+    .table-responsive{overflow:visible}
+    table.table-modern thead{display:none}
+    table.table-modern tbody tr{display:block;margin-bottom:10px}
+    table.table-modern tbody td.cell{
+      display:flex;justify-content:space-between;gap:12px;border:1px solid var(--ow-border)!important;
+      border-radius:10px;margin:6px 0;padding:10px 12px
+    }
+    .cell::before{content:attr(data-label);font-weight:600;color:#6b7280}
+  }
+</style>
+
+<div class="card mb-3">
+  <div class="card-header py-3">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <h1 class="ow-h1">{{ 'Invoices'|trans }}</h1>
+        <div class="small ow-sub">
+          {{ 'All of your invoices can be found here. You can choose to see either paid or unpaid invoices by clicking corresponding button.'|trans }}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="card-body">
+
+    {# Onglets #}
+    <ul class="nav nav-tabs mb-3" id="invoice-tab" role="tablist">
+      {# onglet Non payées #}
+      {% set is_paid = (request.tab == 'paid') %}
+      <li class="nav-item" role="presentation">
+        <button class="nav-link {{ not is_paid ? 'active' : '' }}" id="unpaid-tab"
+                data-bs-toggle="tab" data-bs-target="#tab-unpaid" type="button" role="tab"
+                aria-controls="tab-unpaid" aria-selected="{{ not is_paid ? 'true':'false' }}">
+          {{ 'Unpaid'|trans }}
+          {% if unpaid_invoices.total %}
+            <span class="badge bg-danger ms-1">{{ unpaid_invoices.total }}</span>
+          {% endif %}
+        </button>
+      </li>
+
+      {# onglet Payées #}
+      <li class="nav-item" role="presentation">
+        <button class="nav-link {{ is_paid ? 'active' : '' }}" id="paid-tab"
+                data-bs-toggle="tab" data-bs-target="#tab-paid" type="button" role="tab"
+                aria-controls="tab-paid" aria-selected="{{ is_paid ? 'true':'false' }}">
+          {{ 'Paid'|trans }}
+          <span class="badge bg-secondary ms-1">{{ paid_invoices.total }}</span>
+        </button>
+      </li>
+    </ul>
+
+    <div class="tab-content">
+      {# ====== NON PAYÉES ====== #}
+      <div class="tab-pane fade {{ not is_paid ? 'show active' : '' }}" id="tab-unpaid" role="tabpanel" aria-labelledby="unpaid-tab">
+        <div class="table-responsive">
+          <table class="table table-modern w-100 align-middle">
+            <thead>
+              <tr>
+                <th>{{ 'Title'|trans }}</th>
+                <th class="text-center">{{ 'Invoice Date'|trans }}</th>
+                <th class="text-center">{{ 'Due Date'|trans }}</th>
+                <th class="text-center">{{ 'Total'|trans }}</th>
+                <th class="text-end">{{ 'Actions'|trans }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for i, invoice in unpaid_invoices.list %}
+                <tr>
+                  <td class="cell" data-label="{{ 'Title'|trans }}">
+                    <span class="inv-id">{{ 'Invoice'|trans }} #{{ invoice.serie ~ "%05s"|format(invoice.nr) }}</span>
+                  </td>
+                  <td class="cell text-center" data-label="{{ 'Invoice Date'|trans }}">{{ invoice.created_at|format_date }}</td>
+                  <td class="cell text-center" data-label="{{ 'Due Date'|trans }}">{{ invoice.due_at|format_date }}</td>
+                  <td class="cell text-center" data-label="{{ 'Total'|trans }}">{{ invoice.total | money(invoice.currency) }}</td>
+                  <td class="cell text-end" data-label="{{ 'Actions'|trans }}">
+                    <a class="btn btn-success btn-sm" href="{{ 'invoice'|link }}/{{ invoice.hash }}">{{ 'Pay'|trans }}</a>
+                  </td>
+                </tr>
+              {% else %}
+                <tr><td class="cell text-muted" colspan="5">{{ 'The list is empty'|trans }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {{ include('partial_pagination.html.twig', { 'list': unpaid_invoices, 'url': 'invoice' }) }}
+      </div>
+
+      {# ====== PAYÉES ====== #}
+      <div class="tab-pane fade {{ is_paid ? 'show active' : '' }}" id="tab-paid" role="tabpanel" aria-labelledby="paid-tab">
+        <div class="table-responsive">
+          <table class="table table-modern w-100 align-middle">
+            <thead>
+              <tr>
+                <th>{{ 'Title'|trans }}</th>
+                <th class="text-center">{{ 'Invoice Date'|trans }}</th>
+                <th class="text-center">{{ 'Paid Date'|trans }}</th>
+                <th class="text-center">{{ 'Total'|trans }}</th>
+                <th class="text-end">{{ 'Actions'|trans }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for i, invoice in paid_invoices.list %}
+                <tr>
+                  <td class="cell" data-label="{{ 'Title'|trans }}">
+                    <span class="inv-id">{{ 'Invoice'|trans }} #{{ invoice.serie ~ "%05s"|format(invoice.nr) }}</span>
+                  </td>
+                  <td class="cell text-center" data-label="{{ 'Invoice Date'|trans }}">{{ invoice.created_at|format_date }}</td>
+                  <td class="cell text-center" data-label="{{ 'Paid Date'|trans }}">{{ invoice.paid_at|format_date }}</td>
+                  <td class="cell text-center" data-label="{{ 'Total'|trans }}">{{ invoice.total | money(invoice.currency) }}</td>
+                  <td class="cell text-end" data-label="{{ 'Actions'|trans }}">
+                    <a class="btn btn-outline-secondary btn-sm" href="{{ 'invoice'|link }}/{{ invoice.hash }}">{{ 'View'|trans }}</a>
+                  </td>
+                </tr>
+              {% else %}
+                <tr><td class="cell text-muted" colspan="5">{{ 'The list is empty'|trans }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {{ include('partial_pagination.html.twig', { 'list': paid_invoices, 'url': 'invoice', 'params': {'tab':'paid'} }) }}
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const params = new URLSearchParams(window.location.search);
+  const tabParam = params.get('tab');
+
+  if (tabParam === 'paid') {
+    const paidTab = document.getElementById('paid-tab');
+    if (paidTab) new bootstrap.Tab(paidTab).show();
+  }
+
+  // MAJ URL quand on change d’onglet (sans rechargement)
+  const unpaidBtn = document.getElementById('unpaid-tab');
+  const paidBtn   = document.getElementById('paid-tab');
+
+  function setTabInUrl(value){
+    const u = new URL(window.location.href);
+    if (value) u.searchParams.set('tab', value); else u.searchParams.delete('tab');
+    u.searchParams.delete('page'); // reset pagination quand on change d’onglet
+    history.replaceState({}, '', u.toString());
+  }
+
+  unpaidBtn?.addEventListener('shown.bs.tab', () => setTabInUrl(null));
+  paidBtn  ?.addEventListener('shown.bs.tab',   () => setTabInUrl('paid'));
+});
+</script>
+{% endblock %}

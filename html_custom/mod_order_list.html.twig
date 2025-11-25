@@ -1,0 +1,223 @@
+{% extends request.ajax ? "layout_blank.html.twig" : "layout_default.html.twig" %}
+{% import "macro_functions.html.twig" as mf %}
+
+{% block meta_title %}{{ 'My Products & Services'|trans }}{% endblock %}
+{% block body_class %}order-list{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active" aria-current="page">{{ 'Services'|trans }}</li>{% endblock %}
+
+{% block content %}
+
+{# ===== Styles “table 2025” (full white + big radius) ===== #}
+<style>
+  :root{
+    --ow-border: var(--bs-border-color, #e5e7eb);
+    --ow-soft: 0 8px 18px rgba(13,71,255,.06);
+    --ow-radius: 16px;
+    --ow-radius-sm: 12px;
+  }
+
+  /* Full white + rayons */
+  body.order-list .card {
+    background:#fff !important;
+    border-color: var(--ow-border) !important;
+    border-radius: var(--ow-radius) !important;
+    box-shadow: var(--ow-soft);
+    overflow: hidden;
+  }
+  body.order-list .card-header {
+    background:#fff !important;
+    border-bottom:1px solid var(--ow-border) !important;
+    border-top-left-radius: var(--ow-radius) !important;
+    border-top-right-radius: var(--ow-radius) !important;
+  }
+  body.order-list .card-body { background:#fff !important; }
+  body.order-list .table-responsive { background:#fff !important; border-radius: var(--ow-radius); }
+
+  .ow-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+  .ow-toolbar .title h1{font-weight:800;margin:0}
+  .ow-sub{color:#6b7280}
+
+  .ow-pills .btn{border-radius:999px}
+
+  /* En-tête sticky arrondi */
+  .ow-sticky-head thead th{
+    position:sticky;top:0;background:#fff !important;z-index:2;
+    border-bottom:1px solid var(--ow-border) !important;
+  }
+
+  /* Statut chips */
+  .chip{border-radius:999px;padding:.35rem .6rem;font-weight:700;font-size:.75rem;display:inline-block}
+  .chip-success{background:#e8f8ee;color:#166534}
+  .chip-warn{background:#fff7e6;color:#92400e}
+  .chip-danger{background:#fde8e8;color:#991b1b}
+  .chip-muted{background:#eef2f7;color:#334155}
+
+  /* Table look – lignes arrondies façon “cards” */
+  .table-modern{border-collapse:separate;border-spacing:0 8px}
+  .table-modern tbody tr{
+    background:#fff;
+    box-shadow: var(--ow-soft);
+  }
+  .table-modern tbody td{
+    border-top:0!important;
+    background:#fff !important;
+  }
+  .table-modern .cell{
+    padding:12px 16px;
+    border-top:1px solid var(--ow-border);
+    border-bottom:1px solid var(--ow-border);
+  }
+  .table-modern .cell:first-child{
+    border-left:1px solid var(--ow-border);
+    border-top-left-radius: var(--ow-radius-sm);
+    border-bottom-left-radius: var(--ow-radius-sm);
+  }
+  .table-modern .cell:last-child{
+    border-right:1px solid var(--ow-border);
+    border-top-right-radius: var(--ow-radius-sm);
+    border-bottom-right-radius: var(--ow-radius-sm);
+  }
+
+  /* Boutons / inputs arrondis */
+  .btn{border-radius: var(--ow-radius-sm) !important;}
+  .form-control{border-radius: var(--ow-radius-sm) !important;}
+
+  /* ID monospace + service titre */
+  .svc-id{font-family:ui-monospace, Menlo, Consolas, monospace;color:#64748b;font-size:.85rem}
+  .svc-title{font-weight:700}
+
+  /* Mobile: table -> blocs arrondis */
+  @media (max-width: 768px){
+    .table-responsive{overflow:visible}
+    table.table-modern thead{display:none}
+    table.table-modern tbody tr{
+      display:block;margin-bottom:12px;
+      border-radius: var(--ow-radius-sm);
+      box-shadow: var(--ow-soft);
+    }
+    table.table-modern tbody td.cell{
+      display:flex;justify-content:space-between;gap:12px;
+      border:1px solid var(--ow-border)!important;
+      border-radius: var(--ow-radius-sm);
+      margin:6px 0;padding:10px 12px;background:#fff !important;
+    }
+    .cell::before{content:attr(data-label);font-weight:600;color:#6b7280}
+  }
+  .ow-hd h2{margin:0;font-size:1.05rem;font-weight:800}
+</style>
+
+{# ===== Barre d’outils ===== #}
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="ow-toolbar">
+      <div class="title">
+        <h2 style="
+    font-size: 1.05rem;
+    font-weight: 600;
+">{{ 'Services'|trans }}</h2>
+        <div class="small ow-sub">{{ 'All of your orders are displayed here. Click on any service to get full information about it.'|trans }}</div>
+      </div>
+      <div class="d-flex gap-2">
+        <a href="{{ 'order'|link }}" class="btn btn-primary">
+          <i class="bi bi-plus-lg me-1"></i>{{ 'New order'|trans }}
+        </a>
+      </div>
+    </div>
+
+    <div class="row g-2 align-items-center mt-3">
+      <div class="col-12 col-md">
+        <form class="d-flex gap-2" method="get" action="{{ 'order/service'|link }}">
+          <input type="hidden" name="CSRFToken" value="{{ CSRFToken }}">
+          <input type="text" name="title" value="{{ request.title }}" class="form-control" placeholder="{{ 'Search by title…'|trans }}">
+          <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
+          {% if request.title %}
+            <a class="btn btn-outline-danger" href="{{ 'order/service'|link }}">{{ 'Reset'|trans }}</a>
+          {% endif %}
+        </form>
+      </div>
+      <div class="col-12 col-md-auto">
+        <div class="btn-group ow-pills" role="group" aria-label="filters">
+          <a class="btn btn-outline-secondary {% if not request.status %}active{% endif %}"
+             href="{{ 'order/service'|link }}">{{ 'All'|trans }}</a>
+          <a class="btn btn-outline-secondary {% if request.status == 'active' %}active{% endif %}"
+             href="{{ 'order/service'|link }}?status=active">{{ 'Active'|trans }}</a>
+          <a class="btn btn-outline-secondary {% if request.status == 'pending_setup' %}active{% endif %}"
+             href="{{ 'order/service'|link }}?status=pending_setup">{{ 'Pending Setup'|trans }}</a>
+          <a class="btn btn-outline-secondary {% if request.status == 'suspended' %}active{% endif %}"
+             href="{{ 'order/service'|link }}?status=suspended">{{ 'Suspended'|trans }}</a>
+          <a class="btn btn-outline-secondary {% if request.status == 'canceled' %}active{% endif %}"
+             href="{{ 'order/service'|link }}?status=canceled">{{ 'Canceled'|trans }}</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ===== Tableau ===== #}
+<div class="card">
+  <div class="card-body">
+    {% set params = { "per_page": 30, "page": request.page, "hide_addons": 1 } %}
+    {% set params = params|merge(request) %}
+    {% set orders = client.order_get_list(params) %}
+
+    {% if orders.list %}
+      <div class="table-responsive">
+        <table class="table table-modern ow-sticky-head w-100 align-middle">
+          <thead>
+            <tr>
+              <th class="text-nowrap">#</th>
+              <th>{{ 'Product/Service'|trans }}</th>
+              <th class="text-center">{{ 'Price'|trans }}</th>
+              <th class="text-center">{{ 'Next due date'|trans }}</th>
+              <th class="text-center">{{ 'Status'|trans }}</th>
+              <th class="text-end">{{ 'Actions'|trans }}</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for i, order in orders.list %}
+            {% set chip =
+              order.status == 'active' ? 'chip-success' :
+              (order.status in ['pending_setup'] ? 'chip-warn' :
+              (order.status in ['failed_setup','suspended','failed_renew'] ? 'chip-danger' :
+              (order.status == 'canceled' ? 'chip-muted' : 'chip-muted'))) %}
+            <tr>
+              <td class="cell" data-label="#"><span class="svc-id">#{{ order.id }}</span></td>
+              <td class="cell" data-label="{{ 'Product/Service'|trans }}">
+                <div class="svc-title">
+                  <a href="{{ '/order/service/manage'|link }}/{{ order.id }}">{{ order.title }}</a>
+                </div>
+              </td>
+              <td class="cell text-center" data-label="{{ 'Price'|trans }}">
+                {{ order.total | money(order.currency) }}
+                {% if order.period %} · {{ mf.period_name(order.period) }}{% endif %}
+              </td>
+              <td class="cell text-center" data-label="{{ 'Next due date'|trans }}">
+                {% if order.expires_at %}{{ order.expires_at|format_date }}{% else %}-{% endif %}
+              </td>
+              <td class="cell text-center" data-label="{{ 'Status'|trans }}">
+                <span class="chip {{ chip }}">{{ mf.status_name(order.status) }}</span>
+              </td>
+              <td class="cell text-end" data-label="{{ 'Actions'|trans }}">
+                <a class="btn btn-sm btn-outline-secondary" href="{{ '/order/service/manage'|link }}/{{ order.id }}">
+                  {{ 'Manage'|trans }}
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mt-3 d-flex justify-content-between align-items-center">
+        <div class="text-muted small">
+          {{ 'Total'|trans }}: {{ orders.total }}
+        </div>
+        {{ include('partial_pagination.html.twig', { 'list': orders, 'url': 'order/service' }) }}
+      </div>
+    {% else %}
+      <div class="text-center text-muted py-4">{{ 'No orders yet'|trans }}</div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

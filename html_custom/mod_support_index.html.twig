@@ -1,0 +1,143 @@
+{# Page liste + création des tickets (client) #}
+{% extends request.ajax ? "layout_blank.html.twig" : "layout_default.html.twig" %}
+{% import "macro_functions.html.twig" as mf %}
+
+{% set st = request.status|default('open') %}
+{% set tickets = client ? client.support_ticket_get_list({ "per_page": 20, "page": request.page, "status": st }) : null %}
+
+{% block meta_title %}Support{% endblock %}
+{% block page_header %}Support{% endblock %}
+{% block body_class %}support-index{% endblock %}
+
+{% block breadcrumbs %}
+  <ul class="breadcrumb">
+    <li><a href="{{ '/'|link }}">Accueil</a> <span class="dropdown-divider">/</span></li>
+    <li class="active">Support</li>
+  </ul>
+{% endblock %}
+
+{% block content %}
+
+<style>
+  :root{ --ow-border: var(--bs-border-color,#e5e7eb); --ow-shadow:0 8px 18px rgba(13,71,255,.06); }
+  .ow-card{background:#fff;border:1px solid var(--ow-border);border-radius:16px;box-shadow:var(--ow-shadow)}
+  .ow-hd{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--ow-border)}
+  .ow-hd h2{margin:0;font-size:1.05rem;font-weight:800}
+  .ow-bd{padding:18px}
+  .badge-pill{border-radius:999px}
+  .ticket-card{border:1px solid var(--ow-border);border-radius:14px;padding:14px;transition:.15s;background:#fff}
+  .ticket-card:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(13,71,255,.10);border-color:#dbe5ff;background:#f8faff}
+  .ticket-meta{color:#6b7280;font-size:.9rem}
+  .kb-card{display:flex;align-items:center;gap:12px;padding:14px;border:1px dashed var(--ow-border);border-radius:12px;background:#fff}
+  .kb-card i{font-size:1.1rem}
+  .form-control, .form-select{border-radius:12px}
+  .btn{border-radius:12px;font-weight:600}
+</style>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-8">
+    <div class="ow-card">
+      <div class="ow-hd">
+        <h2>Vos tickets</h2>
+        <div class="d-flex gap-2">
+          <a href="{{ 'support'|link({ 'ticket': 1 }) }}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i> Nouveau ticket
+          </a>
+        </div>
+      </div>
+
+      <div class="ow-bd">
+
+        {# Filtres par statut #}
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          {% set mk = {
+            'open': 'Ouverts',
+            'on_hold': 'En attente',
+            'closed': 'Fermés'
+          } %}
+          {% for key,label in mk %}
+            <a class="btn btn-sm {% if st==key %}btn-dark{% else %}btn-outline-secondary{% endif %}"
+               href="{{ 'support'|link({ 'status': key }) }}">
+              {{ label }}
+            </a>
+          {% endfor %}
+        </div>
+
+        {# Liste tickets #}
+        {% if tickets and tickets.list %}
+          <div class="vstack gap-2">
+            {% for t in tickets.list %}
+              <a class="ticket-card text-reset text-decoration-none" href="{{ 'support/ticket'|link }}/{{ t.id }}">
+                <div class="d-flex align-items-start justify-content-between">
+                  <div class="me-3">
+                    <div class="fw-bold">#{{ t.id }} — {{ t.subject|default('Sans objet')|truncate(90) }}</div>
+                    <div class="ticket-meta">
+                      {% if t.helpdesk and t.helpdesk.name %}<span class="me-2">{{ t.helpdesk.name }}</span>{% endif %}
+                      <span class="me-2">MAJ {{ t.updated_at|timeago }}</span>
+                      <span>Créé {{ t.created_at|timeago }}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <span class="badge badge-pill
+                      {% if t.status=='open' %}bg-success
+                      {% elseif t.status=='on_hold' %}bg-warning text-dark
+                      {% elseif t.status=='closed' %}bg-secondary
+                      {% else %}bg-light text-dark{% endif %}">
+                      {{ mf.status_name(t.status) }}
+                    </span>
+                  </div>
+                </div>
+              </a>
+            {% endfor %}
+          </div>
+
+          {# Pagination #}
+          <div class="d-flex justify-content-end mt-3">
+            {{ include('partial_pagination.html.twig', { 'list': tickets, 'url': 'support' }) }}
+          </div>
+        {% else %}
+          <div class="alert alert-info mb-0">Aucun ticket pour le moment.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-4">
+    <div class="ow-card mb-3">
+      <div class="ow-hd"><h2>Créer un ticket</h2></div>
+      <div class="ow-bd">
+        {# On s’appuie sur la route standard (simple et sûr) #}
+        <form method="get" action="{{ 'support'|link }}">
+          <input type="hidden" name="ticket" value="1">
+          <div class="mb-2">
+            <label class="form-label">Objet</label>
+            <input type="text" class="form-control" name="subject" placeholder="Brève description de votre demande" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Département</label>
+            {{ mf.selectbox('helpdesk_id', guest.support_helpdesk_get_pairs, null, 1) }}
+          </div>
+          <button class="btn btn-primary w-100" type="submit">
+            Poursuivre
+          </button>
+        </form>
+      </div>
+    </div>
+
+    {% if guest.support_kb_enabled() %}
+      <div class="ow-card">
+        <div class="ow-hd"><h2>Base de connaissances</h2></div>
+        <div class="ow-bd">
+          <a class="kb-card text-decoration-none text-reset" href="{{ 'support/kb'|link }}">
+            <i class="bi bi-journals"></i>
+            <div>
+              <div class="fw-bold">Trouver une réponse rapidement</div>
+              <div class="text-muted small">Consultez nos articles et guides avant d’ouvrir un ticket.</div>
+            </div>
+          </a>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

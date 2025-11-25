@@ -1,0 +1,351 @@
+{# THEME OVERRIDE LOADED — KPI + Icons (FR) #}
+
+{% extends request.ajax ? "layout_blank.html.twig" : "layout_default.html.twig" %}
+
+{% block meta_title %}Espace client{% endblock %}
+{% block page_header %}Tableau de bord{% endblock %}
+
+{% block body_class %}dashboard{% endblock %}
+{% block breadcrumbs %}
+    {% if not settings.hide_dashboard_breadcrumb %}
+        <ul class="breadcrumb">
+            <li><a href="{{ '/'|link }}">Accueil</a> <span class="dropdown-divider">/</span></li>
+            <li class="active">Tableau de bord</li>
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% import "macro_functions.html.twig" as mf %}
+
+{% block content %}
+
+    {% if client %}
+{# === KPI WELCOME BLOCK (look carte blanche) === #}
+{% set total_invoices = client.invoice_get_list().total %}
+{% set unpaid_invoices = client.invoice_get_list({ "status": "unpaid" }).total %}
+{% set active_orders  = client.order_get_list({ "hide_addons": 1, "status": "active" }).total %}
+{% set open_tickets   = client.support_ticket_get_list({ "status": "open" }).total %}
+
+<div class="mb-3">
+  <h3 class="mb-3" style="font-weight:800;">Bienvenue {{ profile.first_name|default(profile.email)|default('') }} 👋</h3>
+
+  {% if settings.showcase_enabled %}
+    <div class="alert alert-info" role="alert">
+      <p>{{ settings.showcase_text |markdown }}</p>
+      {% if (settings.showcase_button_url) and (settings.showcase_button_title) %}
+        <a class="btn btn-primary btn-large" href="{{ settings.showcase_button_url }}">{{ settings.showcase_button_title }}</a>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <div class="row row-cols-1 row-cols-md-4 g-3 kpi-grid">
+    <div class="col">
+      <div class="kpi-card">
+        <div class="kpi-meta">
+          <p class="kpi-title">Commandes actives</p>
+          <p class="kpi-value">{{ active_orders }}</p>
+        </div>
+        <div class="kpi-icon"><i class="bi bi-briefcase"></i></div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="kpi-card">
+        <div class="kpi-meta">
+          <p class="kpi-title">Factures (total)</p>
+          <p class="kpi-value">{{ total_invoices }}</p>
+        </div>
+        <div class="kpi-icon"><i class="bi bi-receipt"></i></div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="kpi-card">
+        <div class="kpi-meta">
+          <p class="kpi-title">Factures impayées</p>
+          <p class="kpi-value">{{ unpaid_invoices }}</p>
+        </div>
+        <div class="kpi-icon"><i class="bi bi-cash-coin"></i></div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="kpi-card">
+        <div class="kpi-meta">
+          <p class="kpi-title">Tickets ouverts</p>
+          <p class="kpi-value">{{ open_tickets }}</p>
+        </div>
+        <div class="kpi-icon"><i class="bi bi-chat-dots"></i></div>
+      </div>
+    </div>
+  </div>
+</div>
+{# === FIN KPI WELCOME BLOCK === #}
+
+{# --- Alerte : réponses en attente sur tickets --- #}
+{% set tickets = client.support_ticket_get_list({ "status": 'on_hold' }) %}
+{% if tickets.total > 0 %}
+  <div class="row">
+    <div class="col-12">
+      {% for i, ticket in tickets.list %}
+        <div class="alert alert-info d-flex justify-content-between align-items-center" role="alert">
+          <span>Le ticket <strong>#{{ ticket.id }}</strong> a reçu une réponse il y a {{ ticket.updated_at|timeago }}.</span>
+          <a href="{{ 'support/ticket'|link }}/{{ ticket.id }}" class="alert-link">Répondre</a>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+{% endif %}
+
+{# =========================
+   LIGNE 1 : Commandes + Tickets de support (styles inline identiques)
+   ========================= #}
+<div class="row g-4">
+
+  {# --- Commandes (modernisé, styles inline) --- #}
+  <div class="col-12 col-lg-8">
+    <div
+      style="background:#fff;border:1px solid var(--bs-border-color);border-radius:16px;box-shadow:0 8px 18px rgba(13,71,255,.06);"
+      class="h-100"
+    >
+      <div
+        style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--bs-border-color);"
+      >
+        <span class="h6 m-0 pt-1">Commandes</span>
+        <div class="d-flex gap-2">
+          <a class="btn btn-sm btn-primary order-button" href="{{ 'order'|link }}">
+            <i class="bi bi-plus-lg me-1"></i> Nouvelle commande
+          </a>
+          <a class="btn btn-sm btn-outline-secondary" href="{{ 'order/service'|link }}">
+            Toutes les commandes
+          </a>
+        </div>
+      </div>
+
+      <div style="padding:16px;">
+        {# Mini stats #}
+        <div class="d-flex flex-wrap gap-3 mb-3">
+          <span class="badge text-bg-primary">Actives : {{ client.order_get_list({ "hide_addons": 1, "status": "active" }).total }}</span>
+          <span class="badge text-bg-warning">À échéance : {{ client.order_get_list({ "expiring": 1 }).total }}</span>
+          <span class="badge text-bg-secondary">Total : {{ client.order_get_list({ "hide_addons": 1}).total }}</span>
+        </div>
+
+        {# Liste des 5 dernières commandes #}
+        {% set orders_list = client.order_get_list({ "per_page": 5, "page": request.page, "hide_addons": 1 }).list %}
+        {% if orders_list %}
+          <div class="list-group list-group-flush">
+            {% for i, order in orders_list %}
+              <a href="{{ 'order/service/manage'|link }}/{{ order.id }}"
+                 class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                <div>
+                  <div>
+                    <span><strong>#{{ order.id }}</strong></span>&nbsp;<span>{{ order.title|truncate(60) }}</span>
+                  </div>
+                  <span class="text-secondary small" title="{{ order.updated_at|format_date }}">
+                    {{ order.updated_at|timeago }}
+                  </span>
+                </div>
+                <div>
+                  <span class="badge
+                    {% if order.status == 'active' %}bg-success
+                    {% elseif order.status == 'pending_setup' %}bg-warning
+                    {% elseif order.status in ['failed_setup','suspended','failed_renew'] %}bg-danger
+                    {% elseif order.status == 'canceled' %}bg-secondary
+                    {% else %}bg-light text-dark{% endif %}">
+                    {{ mf.status_name(order.status) }}
+                  </span>
+                </div>
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-center text-muted py-3">Aucune commande récente</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# --- Tickets de support (modernisé + bouton "Nouveau", styles inline) --- #}
+  <div class="col-12 col-lg-4">
+    <div
+      style="background:#fff;border:1px solid var(--bs-border-color);border-radius:16px;box-shadow:0 8px 18px rgba(13,71,255,.06);"
+      class="h-100"
+    >
+      <div
+        style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--bs-border-color);"
+      >
+        <span class="h6 m-0 pt-1">Tickets de support</span>
+        <a class="btn btn-sm btn-primary" href="{{ 'support'|link({ 'ticket': 1 }) }}">
+          <i class="bi bi-plus-lg me-1"></i> Nouveau
+        </a>
+      </div>
+
+      <div style="padding:8px 0;">
+        {% if client.support_ticket_get_list({ "per_page": 5 }).list %}
+          <div class="list-group list-group-flush">
+            {% for i, ticket in client.support_ticket_get_list({ "per_page": 5 }).list %}
+              <a href="{{ 'support/ticket'|link }}/{{ ticket.id }}"
+                 class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                <div>
+                  <div>
+                    <span><strong>#{{ ticket.id }}</strong></span>&nbsp;<span>{{ ticket.subject|truncate(60) }}</span>
+                  </div>
+                  <span class="text-secondary small" title="{{ ticket.updated_at|format_date }}">{{ ticket.updated_at|timeago }}</span>
+                </div>
+                <div>
+                  <span class="badge
+                    {% if ticket.status == 'open' %}bg-success
+                    {% elseif ticket.status == 'on_hold' %}bg-warning
+                    {% elseif ticket.status == 'closed' %}bg-secondary
+                    {% else %}bg-light text-dark{% endif %}">
+                    {{ mf.status_name(ticket.status) }}
+                  </span>
+                </div>
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-center text-muted py-3">Aucun ticket récent</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{# =========================
+   LIGNE 2 : Actualités + Emails reçus (styles inline)
+   ========================= #}
+<div class="row g-4 mt-1">
+  {# -------- Actualités -------- #}
+  <div class="col-12 col-lg-6">
+    <div
+      style="background:#fff;border:1px solid var(--bs-border-color);border-radius:16px;box-shadow:0 8px 18px rgba(13,71,255,.06);"
+      class="h-100"
+    >
+      <div
+        style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--bs-border-color);"
+      >
+        <div>
+          <div class="h6 m-0">Actualités</div>
+          <div style="color:#6b7280;font-size:.9rem;">Dernières annonces et nouveautés</div>
+        </div>
+        {% if guest.extension_is_on({"mod":"news"}) %}
+          <a class="btn btn-sm btn-outline-primary" href="{{ '/news'|link }}">Voir tout</a>
+        {% else %}
+          <span class="text-muted small">Module News inactif</span>
+        {% endif %}
+      </div>
+
+      <div style="padding:8px 0;">
+        {% if guest.extension_is_on({"mod":"news"}) %}
+          {% set news_list = guest.news_get_list({ "per_page": 3, "page": 1 }).list %}
+          {% if news_list %}
+            <div class="list-group list-group-flush">
+              {% for n in news_list %}
+                <a href="{{ '/news'|link }}" class="list-group-item list-group-item-action">
+                  <div class="d-flex w-100 justify-content-between">
+                    <strong class="mb-1">{{ n.title|default('Annonce')|truncate(80) }}</strong>
+                    <small class="text-muted">{{ n.updated_at|default(n.created_at)|timeago }}</small>
+                  </div>
+                  {% if n.summary %}
+                    <p class="mb-1 text-muted">{{ n.summary|striptags|truncate(120) }}</p>
+                  {% endif %}
+                </a>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="text-center text-muted py-3">Aucune actualité pour le moment</div>
+          {% endif %}
+        {% else %}
+          <div class="text-center text-muted py-3">Activez le module News pour afficher les actualités.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# -------- Emails reçus -------- #}
+  <div class="col-12 col-lg-6">
+    <div
+      style="background:#fff;border:1px solid var(--bs-border-color);border-radius:16px;box-shadow:0 8px 18px rgba(13,71,255,.06);"
+      class="h-100"
+    >
+      <div
+        style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--bs-border-color);"
+      >
+        <div>
+          <div class="h6 m-0">Emails reçus</div>
+          <div style="color:#6b7280;font-size:.9rem;">Historique & notifications</div>
+        </div>
+        <a class="btn btn-sm btn-outline-primary" href="{{ '/email'|link }}">Voir tout</a>
+      </div>
+
+      <div style="padding:8px 0;">
+        {% set emails_list = client.email_get_list({ "per_page": 3, "page": 1 }).list %}
+        {% if emails_list %}
+          <div class="list-group list-group-flush">
+            {% for e in emails_list %}
+              <a href="{{ '/email'|link }}" class="list-group-item list-group-item-action">
+                <div class="d-flex w-100 justify-content-between">
+                  <strong class="mb-1">{{ e.subject|default('Message')|truncate(80) }}</strong>
+                  <small class="text-muted">{{ e.created_at|timeago }}</small>
+                </div>
+                {% if e.from %}
+                  <div class="text-muted small">De : {{ e.from }}</div>
+                {% endif %}
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-center text-muted py-3">Aucun email récent</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+    {% else %}
+{# =========================
+   VISITEUR NON CONNECTÉ
+   ========================= #}
+      <div class="row">
+        <div class="col-md-6">
+          <div class="card mb-4">
+            <div class="card-header h6 py-3">Profil</div>
+            <div class="card-body">
+              <p>Vous n’êtes pas connecté(e)</p>
+              <div class="d-flex gap-2">
+                <a class="btn btn-sm btn-primary" href="{{ '/login'|link }}">Connexion</a>
+                <a class="btn btn-sm btn-dark" href="{{ '/signup'|link }}">Créer un compte</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <div class="card mb-4">
+            <div class="card-header h6 py-3">Commander</div>
+            <div class="card-body">
+              <p>Commander de nouveaux produits et services</p>
+              <div class="d-flex gap-2">
+                <a class="btn btn-sm btn-dark" href="{{ '/order'|link }}">Commander</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {% if guest.extension_is_on({"mod":"news"}) %}
+          <div class="col-md-6">
+            <div class="card mb-4">
+              <div class="card-header h6 py-3">Actualités</div>
+              <div class="card-body">
+                <p>Dernières nouvelles et annonces</p>
+                <div class="d-flex gap-2">
+                  <a class="btn btn-sm btn-dark" href="{{ '/news'|link }}">Voir les annonces</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+{% endblock %}

@@ -1,0 +1,221 @@
+{% extends request.ajax ? "layout_blank.html.twig" : "layout_default.html.twig" %}
+
+{% block meta_title %}{{ 'Emails'|trans }}{% endblock %}
+{% block breadcrumb %}<li class="active breadcrumb-item" aria-current="page">{{ 'Emails'|trans }}</li>{% endblock %}
+
+{% set emails = client.email_get_list({"per_page":10, "page":request.page}) %}
+
+{% block body_class %}email-index{% endblock %}
+
+{% block content %}
+
+<style>
+  /* ===== Look 2025 + radius forcés ===== */
+  :root{
+    --ow-radius: 16px;
+    --ow-soft: 0 10px 28px rgba(16,24,40,.06);
+    --ow-border: #eef2f7;
+  }
+
+  /* Cards full-white + radius */
+  .card{ border:1px solid var(--ow-border) !important; border-radius: var(--ow-radius) !important; box-shadow: var(--ow-soft); background:#fff !important; }
+  .card-header{ border-radius: calc(var(--ow-radius) - 2px) calc(var(--ow-radius) - 2px) 0 0 !important; background:#fff !important; }
+  .card-body{ border-radius: 0 0 calc(var(--ow-radius) - 2px) calc(var(--ow-radius) - 2px) !important; background:#fff !important; }
+
+  /* Layout paddings */
+  .email-layout-pad{ padding:20px; }
+  .email-pane{ padding:20px; }
+
+  /* Colonne gauche (liste) */
+  .email-list .list-group-item{
+    padding:12px 16px;
+    border:1px solid var(--ow-border) !important;
+    border-radius: 12px !important;
+    margin: 0 12px 10px 12px;
+    background:#fff !important;
+    transition: transform .06s ease, box-shadow .12s ease, border-color .12s ease;
+  }
+  .email-list .list-group-item:hover{ transform: translateY(-1px); box-shadow: 0 6px 14px rgba(16,24,40,.06); }
+  .email-list .list-group-item.active{
+    border-color:#dbe5ff !important;
+    background: linear-gradient(0deg,#f6f8ff 0%,#fff 100%) !important;
+    box-shadow: inset 0 0 0 1px #e6edff, 0 8px 18px rgba(13,71,255,.06);
+  }
+
+  /* Colonne droite (contenu) */
+  .email-right{ border-left:1px solid var(--ow-border); }
+  .email-header h6{ font-weight:800; letter-spacing:.2px; }
+  .email-header .text-muted{ color:#6b7280 !important; }
+
+  /* Iframe d’aperçu */
+  .email-frame{
+    border:1px solid var(--ow-border) !important;
+    border-radius: 14px !important;
+    overflow:hidden;
+    box-shadow: var(--ow-soft);
+    background:#fff;
+    width: 100%;
+    height: 30em;
+  }
+
+  /* Tabs (si présents) */
+  .nav-tabs .nav-link{
+    border-radius: 999px !important;
+  }
+
+  /* Boutons */
+  .btn{ border-radius: 12px !important; }
+  .btn-outline-secondary{ border-color:#e5e7eb !important; }
+  .btn-outline-danger{ border-color:#ffd6d6 !important; }
+
+  @media (max-width: 991.98px){
+    .email-layout-pad, .email-pane{ padding:14px; }
+    .email-right{ border-left:0; }
+  }
+</style>
+
+<div class="row">
+  <div class="col-md-12">
+    <div class="card mb-4">
+      <div class="card-header py-3">
+        <div class="d-flex justify-content-between align-items-center">
+          <div class="email-layout-pad pt-0 pb-0">
+            <h1 class="mb-1">{{ 'Emails'|trans }}</h1>
+            <span class="small text-muted">{{ "Here you can find all the emails we've sent you."|trans }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-body p-0">
+        {% if emails.list is empty %}
+          <div class="m-3 alert alert-info" id="information-block" style="border-radius:12px">
+            {{ 'There are no emails to display'|trans }}
+          </div>
+        {% else %}
+          <div class="d-flex flex-column flex-md-row">
+            <!-- Liste gauche -->
+            <div class="nav nav-tabs flex-column col-md-4 border-0">
+              <div class="list-group email-list" id="list-tab" role="tablist">
+                {% for i, email in emails.list %}
+                  <a class="list-group-item list-group-item-action{% if loop.first %} active{% endif %}"
+                     href="#mail-{{ loop.index }}" data-bs-toggle="list" role="tab">
+                    <div class="flex-column">
+                      <p class="m-0" style="font-size: 90%;">{{ email.subject | truncate }}</p>
+                      <span class="text-muted small" style="font-size: 80%;">{{ email.created_at|format_datetime }}</span>
+                    </div>
+                  </a>
+                {% endfor %}
+              </div>
+            </div>
+
+            <!-- Contenu droit -->
+            <div class="col-md-8 tab-content email-right">
+              {% for i, email in emails.list %}
+                <div class="tab-pane fade{% if loop.first %} show active{% endif %}" id="mail-{{ loop.index }}" role="tabpanel">
+                  <div class="email-pane">
+                    <div class="email-header mb-2">
+                      <h6 class="mb-2">{{ email.subject }}</h6>
+                      <div class="d-flex justify-content-between align-items-start gap-2">
+                        <div class="d-flex flex-column gap-1">
+                          <span class="d-block"><span class="text-muted me-2">{{ 'From'|trans }}</span>{{ email.sender }}</span>
+                          <span class="d-block"><span class="text-muted me-2">{{ 'To'|trans }}</span>{{ email.recipients }}</span>
+                        </div>
+                        <div class="d-flex flex-column align-items-end gap-2">
+                          <div class="btn-group d-flex" role="group" aria-label="{{ 'Mail Action'|trans }}">
+                            <a class="btn btn-sm btn-outline-secondary border-end-0" href="{{ 'email'|link }}/{{ email.id }}" data-bs-toggle="tooltip" data-bs-title="{{ 'View'|trans }}">👁️</a>
+                            <a class="btn btn-sm btn-outline-secondary email-resend" href="#" data-id="{{ email.id }}" data-bs-toggle="tooltip" data-bs-title="{{ 'Resend'|trans }}">🔁</a>
+                            <a class="btn btn-sm btn-outline-danger border-start-0 email-delete" href="#" data-id="{{ email.id }}" data-bs-toggle="tooltip" data-bs-title="{{ 'Delete'|trans }}">🗑️</a>
+                          </div>
+                          <small class="text-muted">{{ email.created_at|format_date }}</small>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Iframe du contenu -->
+                    <iframe class="email-frame" id="email-content-{{ i }}" src="about:blank"></iframe>
+                    <script>
+                      (function () {
+                        const frame = document.getElementById("email-content-{{ i }}");
+                        frame.srcdoc = `{{ email.content_html|raw }}`;
+                      })();
+                    </script>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+      </div>
+
+      {% if emails.pages >= 2 %}
+        <div class="card-footer email-layout-pad">
+          {{ include('partial_pagination.html.twig', { 'list': emails }) }}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block js %}
+{% autoescape "js" %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const resendEmailBtn = document.querySelectorAll('.email-resend');
+  const deleteEmailBtn = document.querySelectorAll('.email-delete');
+
+  resendEmailBtn.forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      toggleLoader();
+      API.client.post('email/resend',
+        {id: btn.dataset.id, CSRFToken: "{{ CSRFToken }}"},
+        () => flashMessage({ message: 'Email resent', reload: '{{ 'email'|link }}' }),
+        (res) => { FOSSBilling.message(`${res.message} (${res.code})`, 'error'); toggleLoader(); }
+      )
+    });
+  });
+
+  deleteEmailBtn.forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (!confirm('Are you sure?')) return;
+      toggleLoader();
+      API.client.post('email/delete',
+        {id: btn.dataset.id, CSRFToken: "{{ CSRFToken }}"},
+        () => flashMessage({ message: 'Email #'+ btn.dataset.id +' deleted', reload: '{{ 'email'|link }}' }),
+        (res) => { FOSSBilling.message(`${res.message} (${res.code})`, 'error'); toggleLoader(); }
+      )
+    });
+  });
+
+  const toggleLoader = () => {
+    const loader = document.querySelector('.wait');
+    if (!loader) return;
+    loader.style.display = (loader.style.display === 'none') ? 'block' : 'none';
+  }
+
+  // Ajuste la hauteur des iframes après affichage
+  function setEmailHeights(){
+    const emails = document.querySelectorAll('.email-frame');
+    emails.forEach(email => {
+      const body = email.contentDocument?.body;
+      const html = email.contentDocument?.documentElement;
+      let h = 480;
+      if (body) h = Math.max(body.scrollHeight, body.offsetHeight, h);
+      else if (html) h = Math.max(html.clientHeight, html.scrollHeight, html.offsetHeight, h);
+      email.style.height = h + 'px';
+    });
+  }
+
+  // Recalcule après changement d’onglet
+  document.querySelectorAll('a[data-bs-toggle="list"]').forEach(el => {
+    el.addEventListener('shown.bs.tab', setEmailHeights);
+  });
+
+  // Premier calcul
+  setTimeout(setEmailHeights, 150);
+});
+</script>
+{% endautoescape %}
+{% endblock %}

@@ -1,0 +1,321 @@
+{% extends request.ajax ? "layout_blank.html.twig" : "layout_default.html.twig" %}
+{% import "macro_functions.html.twig" as mf %}
+
+{# ===== Préparations ===== #}
+{% set nr = invoice.serie ~ "%05s"|format(invoice.nr) %}
+{% set seller = invoice.seller %}
+{% set buyer  = invoice.buyer %}
+{% set prompt_subscription = settings.prompt_subscription|default(true) %}
+{% set invoice_subscribable = invoice.subscribable|default(false) %}
+{% set gateways = guest.invoice_gateways|default([]) %}
+
+{% block meta_title %}{{ 'Invoice'|trans }} #{{ nr }}{% endblock %}
+{% block body_class %}invoice-invoice{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{{ '/invoice'|link }}">{{ 'Invoices'|trans }}</a></li>
+  <li class="breadcrumb-item active" aria-current="page">#{{ nr }}</li>
+{% endblock %}
+
+{% block content %}
+
+{# ===== Styles 2025 (full white + padding renforcé) ===== #}
+<style>
+  :root{
+    --ow-border: var(--bs-border-color, #e5e7eb);
+    --ow-soft: 0 10px 26px rgba(13,71,255,.08);
+    --ow-primary:#0d47ff;
+    --ow-primary-600:#0b3fe0;
+    --ow-space: 22px; /* padding global renforcé */
+  }
+  .ow-card{background:#fff;border:1px solid var(--ow-border);border-radius:18px;box-shadow:var(--ow-soft)}
+  .ow-pad{padding:var(--ow-space)}
+  .ow-h1{font-weight:800;margin:0}
+  .ow-sub{color:#6b7280}
+  .btn-primary{background:var(--ow-primary);border-color:var(--ow-primary)}
+  .btn-primary:hover{background:var(--ow-primary-600);border-color:var(--ow-primary-600)}
+
+  .pay-grid{display:grid;gap:16px;grid-template-columns:repeat(4,minmax(0,1fr))}
+  @media (max-width:1200px){.pay-grid{grid-template-columns:repeat(3,1fr)}}
+  @media (max-width:768px){.pay-grid{grid-template-columns:repeat(2,1fr)}}
+  @media (max-width:480px){.pay-grid{grid-template-columns:1fr}}
+
+  .pay-item{border:1px solid var(--ow-border);border-radius:14px;display:flex;align-items:center;justify-content:center;padding:16px;background:#fff;cursor:pointer;transition:.18s}
+  .pay-item:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(13,71,255,.10);border-color:#dbe5ff;background:#f8faff}
+  .pay-logo{background: center/contain no-repeat transparent; width: 140px; height: 46px}
+  .pay-title{font-size:.9rem;color:#334155;margin-top:8px;text-align:center}
+
+  .kv dt{color:#6b7280}
+  .kv dd, .kv dt { padding-top: .25rem; padding-bottom: .25rem; }
+  .badge-tight{border-radius:999px;padding:.45rem .7rem;font-weight:700;font-size:.75rem}
+  .table thead th{background:#fff}
+  .ow-gap{gap:12px}
+</style>
+
+<div class="row g-3">
+
+  {# ===== En-tête facture avec « Retour à mes factures » en HAUT ===== #}
+  <div class="col-12">
+    <div class="ow-card">
+      <div class="card-header py-3 px-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap ow-gap">
+          <div class="d-flex align-items-center ow-gap">
+            <a class="btn btn-outline-secondary" href="{{ '/invoice'|link }}">
+              {{ 'Retour à mes factures'|trans }}
+            </a>
+            <div class="d-flex flex-column ms-1">
+              <h5 class="mb-1">{{ 'Facture'|trans }} #{{ nr }}</h5>
+              <span class="small text-muted">{{ "Vous pouvez imprimer cette facture ou l'exporter en PDF."|trans }}</span>
+            </div>
+          </div>
+          <div class="d-flex align-items-center ow-gap">
+            <a href="{{ 'invoice/pdf'|link }}/{{ invoice.hash }}" target="_blank" class="btn btn-sm btn-danger px-3 py-2">PDF</a>
+            <a href="{{ 'invoice/print'|link }}/{{ invoice.hash }}" target="_blank" class="btn btn-sm btn-dark px-3 py-2">{{ 'Imprimer'|trans }}</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="ow-pad">
+
+        {# ===== Infos facture / société ===== #}
+        <div class="row">
+          <div class="col-md-6 mb-4">
+            <h6 class="fw-bold mb-3">{{ 'Informations facture'|trans }}</h6>
+            <dl class="row kv small">
+              <dt class="col-sm-5">{{ 'Date de facture'|trans }}</dt>
+              <dd class="col-sm-7">
+                {% if invoice.paid_at|trim %}{{ invoice.paid_at|format_date }}{% else %}{{ invoice.created_at|format_date }}{% endif %}
+              </dd>
+
+              <dt class="col-sm-5">{{ "Date d'échéance"|trans }}</dt>
+              <dd class="col-sm-7">
+                {% if invoice.due_at|trim %}{{ invoice.due_at|format_date }}{% else %}—{% endif %}
+              </dd>
+
+              <dt class="col-sm-5">{{ 'Statut'|trans }}</dt>
+              <dd class="col-sm-7">
+                <span class="badge-tight badge {% if invoice.status == 'paid' %}bg-success{% elseif invoice.status == 'unpaid' %}bg-warning{% else %}bg-secondary{% endif %}">
+                  {{ mf.status_name(invoice.status) }}
+                </span>
+              </dd>
+            </dl>
+          </div>
+
+          <div class="col-md-6 mb-4">
+            <h6 class="fw-bold mb-3">{{ 'Société'|trans }}</h6>
+            <dl class="row kv small">
+              {% if seller.company|trim %}<dt class="col-sm-4">{{ 'Nom'|trans }}</dt><dd class="col-sm-8">{{ seller.company }}</dd>{% endif %}
+              {% if seller.company_vat|trim %}<dt class="col-sm-4">VAT</dt><dd class="col-sm-8">{{ seller.company_vat }}</dd>{% endif %}
+              {% if seller.address|trim %}<dt class="col-sm-4">{{ 'Adresse'|trans }}</dt><dd class="col-sm-8">{{ seller.address }}</dd>{% endif %}
+              {% if seller.phone|trim %}<dt class="col-sm-4">{{ 'Téléphone'|trans }}</dt><dd class="col-sm-8">{{ seller.phone }}</dd>{% endif %}
+              {% if seller.email|trim %}<dt class="col-sm-4">Email</dt><dd class="col-sm-8">{{ seller.email }}</dd>{% endif %}
+              {% if seller.account_number|trim %}<dt class="col-sm-4">{{ 'Compte'|trans }}</dt><dd class="col-sm-8">{{ seller.account_number }}</dd>{% endif %}
+              {% if seller.note|trim %}<dt class="col-sm-4">{{ 'Note'|trans }}</dt><dd class="col-sm-8">{{ seller.note }}</dd>{% endif %}
+            </dl>
+          </div>
+        </div>
+
+        {# ===== Infos client ===== #}
+        <div class="row">
+          <div class="col-md-6 mb-4">
+            <h6 class="fw-bold mb-3">{{ 'Client'|trans }}</h6>
+            <dl class="row kv small">
+              {% if buyer.first_name|trim or buyer.last_name|trim %}
+                <dt class="col-sm-4">{{ 'Nom'|trans }}</dt><dd class="col-sm-8">{{ buyer.first_name }} {{ buyer.last_name }}</dd>
+              {% endif %}
+              {% if buyer.company|trim %}
+                <dt class="col-sm-4">{{ 'Société'|trans }}</dt><dd class="col-sm-8">{{ buyer.company }}</dd>
+              {% endif %}
+              {% if buyer.company_number|trim %}
+                <dt class="col-sm-4">{{ "N° d'entreprise"|trans }}</dt><dd class="col-sm-8">{{ buyer.company_number }}</dd>
+              {% endif %}
+              {% if buyer.company_vat|trim %}
+                <dt class="col-sm-4">VAT</dt><dd class="col-sm-8">{{ buyer.company_vat }}</dd>
+              {% endif %}
+              {% if buyer.address|trim %}
+                <dt class="col-sm-4">{{ 'Adresse'|trans }}</dt>
+                <dd class="col-sm-8">{{ buyer.address }}</dd>
+                <dd class="col-sm-4">{{ buyer.city }}, {{ buyer.state }}</dd>
+                <dd class="col-sm-8">{{ buyer.zip }}, {{ guest.system_countries[buyer.country] }}</dd>
+              {% endif %}
+              {% if buyer.phone|trim %}
+                <dt class="col-sm-4">{{ 'Téléphone'|trans }}</dt><dd class="col-sm-8">{{ buyer.phone }}</dd>
+              {% endif %}
+            </dl>
+          </div>
+        </div>
+
+        {% if invoice.text_1 %}
+          <div class="alert alert-info mt-2 mb-4 p-3">{{ invoice.text_1|markdown }}</div>
+        {% endif %}
+
+        {# ===== Lignes ===== #}
+        <div class="table-responsive">
+          <table class="table table-hover mt-2 mb-0 align-middle">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>{{ 'Intitulé'|trans }}</th>
+                <th>{{ 'Prix'|trans }}</th>
+                <th class="text-end">{{ 'Total'|trans }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for i, item in invoice.lines %}
+              <tr>
+                <td>{{ i+1 }}</td>
+                <td>
+                  {% if item.order_id %}
+                    <a href="{{ '/order/service/manage'|link }}/{{ item.order_id }}">{{ item.title }}</a>
+                  {% else %}
+                    {{ item.title }}
+                  {% endif %}
+                  {% if item.quantity > 1 %}
+                    <span class="text-muted">× {{ item.quantity }} {{ item.unit }}</span>
+                  {% endif %}
+                </td>
+                <td>{{ item.price|money(invoice.currency) }}</td>
+                <td class="text-end">{{ item.total|money(invoice.currency) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        {# ===== Totaux ===== #}
+        <div class="row mt-3">
+          <div class="col-md-4 offset-md-8">
+            <table class="table table-striped">
+              {% if invoice.tax > 0 %}
+                <tr class="text-end"><td>{{ invoice.taxname }} {{ invoice.taxrate }}%</td><td>{{ invoice.tax | money(invoice.currency) }}</td></tr>
+              {% endif %}
+              {% if invoice.discount > 0 %}
+                <tr class="text-end"><td>{{ 'Remise'|trans }}</td><td>{{ invoice.discount | money(invoice.currency) }}</td></tr>
+              {% endif %}
+              <tr class="text-end">
+                <td><strong>{{ 'Total'|trans }}</strong></td>
+                <td><strong>{{ invoice.total | money(invoice.currency) }}</strong></td>
+              </tr>
+            </table>
+          </div>
+        </div>
+
+        {% if invoice.text_2 %}
+          <div class="alert alert-info mt-2 p-3">{{ invoice.text_2|markdown }}</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# ===== Moyens de paiement (toujours EN DESSOUS) ===== #}
+  {% if invoice.status == 'unpaid' %}
+  <div class="col-12" id="payment-section">
+    <div class="ow-card">
+      <div class="ow-pad">
+        <div class="d-flex align-items-center justify-content-between flex-wrap mb-3">
+          <div>
+            <h5 class="ow-h1">{{ 'Moyens de paiement'|trans }}</h5>
+            <div class="ow-sub mt-1">{{ 'Choisissez un moyen de paiement pour régler votre facture.'|trans }}</div>
+          </div>
+        </div>
+
+        {% if gateways is not empty %}
+          <div class="pay-grid mt-2">
+            {% for gtw in gateways %}
+              {% if invoice.currency in gtw.accepted_currencies %}
+                <div class="pay-item"
+                     role="button"
+                     onclick="paymentPrompt('{{ gtw.id|e('js') }}', {{ gtw.allow_recurrent ? 'true' : 'false' }}, '{{ gtw.title|e('js') }}')"
+                     data-bs-toggle="tooltip" data-bs-title="{{ gtw.title }}">
+                  <div class="text-center">
+                    <div class="pay-logo" style="background-image:url('{{ gtw.logo.logo }}')"></div>
+                    <div class="pay-title mt-1">{{ gtw.title }}</div>
+                  </div>
+                </div>
+              {% endif %}
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="alert alert-warning mt-3 mb-0 p-3">
+            {{ "Aucun moyen de paiement n'est disponible pour le moment. Merci de contacter le support."|trans }}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{# ===== Modal de confirmation du paiement ===== #}
+<div class="modal fade" id="paymentPrompt" tabindex="-1" aria-labelledby="paymentPromptLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title" id="paymentPromptLabel"></h4>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ 'Close'|trans }}"></button>
+      </div>
+      <div class="modal-body">
+        <p id="bodyText" class="mb-3"></p>
+        <div class="d-grid gap-2">
+          <a href="#" class="btn btn-primary py-2" id="single">{{ "Payer maintenant (paiement unique)"|trans }}</a>
+          <a href="#" class="btn btn-primary py-2" id="subscription" hidden="true">{{ "Payer et créer un abonnement"|trans }}</a>
+          <a href="#" class="btn btn-primary py-2" id="pay-nondescript" hidden="true">{{ "Payer maintenant"|trans }}</a>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ 'Annuler'|trans }}</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block js %}
+<script>
+  // Modal de sélection / redirection : /invoice/banklink/{hash}/{gateway_id}
+  function paymentPrompt(id, supportsSubscription, title){
+    const invoiceHash = "{{ invoice.hash }}";
+    const baseLink    = "{{ 'invoice/banklink'|link }}";
+    const canSubs     = {{ prompt_subscription ? 'true' : 'false' }};
+    const invoiceSubscribable = {{ invoice_subscribable ? 'true' : 'false' }};
+
+    const link = new URL(baseLink + '/' + invoiceHash + '/' + id);
+
+    const titleEl = document.getElementById('paymentPromptLabel');
+    const bodyEl  = document.getElementById('bodyText');
+    const aSingle = document.getElementById('single');
+    const aSubs   = document.getElementById('subscription');
+    const aNd     = document.getElementById('pay-nondescript');
+
+    titleEl.textContent = `{{ 'Payer avec'|trans }} ${title}`;
+
+    // Reset
+    aSingle.hidden = false;
+    aSubs.hidden   = true;
+    aNd.hidden     = true;
+
+    if (canSubs) {
+      if (supportsSubscription && invoiceSubscribable) {
+        bodyEl.textContent = `{{ "La facture et la passerelle sélectionnée permettent un abonnement. Choisissez votre type de paiement."|trans }}`;
+        aSubs.hidden = false;
+        aSubs.href   = link.toString();                 // abonnement
+        const l2     = new URL(link); l2.searchParams.set('allow_subscription', 0);
+        aSingle.href = l2.toString();                   // paiement unique
+      } else {
+        bodyEl.textContent = `{{ "Utilisez le bouton ci-dessous pour continuer avec ce moyen de paiement."|trans }}`;
+        const l2 = new URL(link); l2.searchParams.set('allow_subscription', 0);
+        aSingle.href = l2.toString();
+      }
+    } else {
+      bodyEl.textContent = `{{ "Utilisez le bouton ci-dessous pour continuer avec ce moyen de paiement."|trans }}`;
+      aSingle.hidden = true;
+      aNd.hidden     = false;
+      aNd.href       = link.toString();
+    }
+
+    const modal = new bootstrap.Modal('#paymentPrompt');
+    modal.show();
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,104 @@
+{# === LOGIN / REGISTER (client) — utilisé au checkout si non connecté === #}
+
+<div id="register-or-login" class="row g-3">
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-header"><h3 class="card-title m-0">{{ 'Se connecter'|trans }}</h3></div>
+      <div class="card-body">
+        <form id="client-login">
+          <input type="hidden" name="CSRFToken" value="{{ CSRFToken }}"/>
+          <div class="mb-3">
+            <label class="form-label">{{ 'Email'|trans }}</label>
+            <input class="form-control" type="email" name="email" required />
+          </div>
+          <div class="mb-3">
+            <label class="form-label">{{ 'Mot de passe'|trans }}</label>
+            <input class="form-control" type="password" name="password" required />
+          </div>
+          <button class="btn btn-primary" type="submit">{{ 'Connexion'|trans }}</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-header"><h3 class="card-title m-0">{{ 'Créer un compte'|trans }}</h3></div>
+      <div class="card-body">
+        <form id="create-profile">
+          <input type="hidden" name="CSRFToken" value="{{ CSRFToken }}"/>
+          <div class="mb-3">
+            <label class="form-label">{{ 'Email'|trans }}</label>
+            <input id="reg-email" class="form-control" type="email" name="email" required />
+          </div>
+          <div class="mb-3">
+            <label class="form-label">{{ 'Mot de passe'|trans }}</label>
+            <input id="reg-password" class="form-control" type="password" name="password" required />
+          </div>
+          <button class="btn btn-dark" type="submit">{{ 'Créer et continuer'|trans }}</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ===== JS (bridge + login/register) ===== #}
+<script>
+/* Bridge */
+window.OW = window.OW || {};
+OW.api = {
+  request(method, params = {}) {
+    if (window.FOSSBilling && FOSSBilling.api && typeof FOSSBilling.api.request === 'function') {
+      return FOSSBilling.api.request(method, params);
+    }
+    return new Promise(function(resolve, reject){
+      if (window.bb && typeof bb.post === 'function') {
+        bb.post(method, params, resolve, function(err){ reject(err && err.message ? err.message : err); });
+      } else {
+        reject('API JS indisponible');
+      }
+    });
+  }
+};
+function owOk(m){ try{ bb && bb.msg && bb.msg(m);}catch(e){} }
+function owErr(m){ console.error(m); alert(m); }
+
+/* Login */
+(function(){
+  var f = document.getElementById('client-login');
+  if(!f) return;
+  f.addEventListener('submit', function(e){
+    e.preventDefault();
+    var data = new URLSearchParams(new FormData(f)).toString();
+    OW.api.request('guest/client/login', data)
+      .then(function(){
+        owOk("{{ 'Connexion réussie'|trans }}");
+        document.getElementById('register-or-login')?.remove();
+        location.reload();
+      })
+      .catch(owErr);
+  });
+})();
+
+/* Register + auto login */
+(function(){
+  var f = document.getElementById('create-profile');
+  if(!f) return;
+  f.addEventListener('submit', function(e){
+    e.preventDefault();
+    var data = new FormData(f);
+    var email = data.get('email');
+    var pass  = data.get('password');
+    OW.api.request('guest/client/create', new URLSearchParams(data).toString())
+      .then(function(){
+        return OW.api.request('guest/client/login', { email: email, password: pass });
+      })
+      .then(function(){
+        owOk("{{ 'Compte créé et connecté'|trans }}");
+        document.getElementById('register-or-login')?.remove();
+        location.reload();
+      })
+      .catch(owErr);
+  });
+})();
+</script>

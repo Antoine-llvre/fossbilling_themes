@@ -1,0 +1,392 @@
+{# themes/ouitemplate/html_custom/mod_servicehosting_manage.html.twig #}
+{# --- ETAT: EN ATTENTE DE CONFIGURATION --- #}
+{% if order.status == 'pending_setup' %}
+<style>
+  :root{ --ow-border: var(--bs-border-color, #e5e7eb); --ow-soft: 0 10px 26px rgba(13,71,255,.08); --ow-primary:#0d47ff; }
+  .ow-card{background:#fff;border:1px solid var(--ow-border);border-radius:18px;box-shadow:var(--ow-soft)}
+  .ow-pad{padding:20px}
+  .ow-h1{font-weight:800;font-size:1.35rem;margin:0}
+  .ow-sub{color:#6b7280}
+  .chip{border-radius:999px;padding:.35rem .6rem;font-weight:700;font-size:.75rem;display:inline-block}
+  .chip-wait{background:#fff7e6;color:#92400e}
+  .btn-ghost{background:#fff;border:1px solid var(--ow-border);border-radius:12px}
+  .btn-ghost:hover{background:#f8faff;border-color:#dbe5ff}
+  .step{display:flex;gap:10px;align-items:flex-start}
+  .step .dot{width:10px;height:10px;border-radius:50%;background:#0d47ff;margin-top:7px}
+    /* Masque l’ancienne carte du thème si présente */
+  .card.mb-4 {display:none !important;}
+</style>
+
+<div class="ow-card ow-pad mb-3">
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+    <div>
+      <div class="ow-h1">{{ order.title }}</div>
+      <div class="mt-1">
+        <span class="chip chip-wait">En attente de configuration</span>
+        <span class="ow-sub ms-2">{{ service.domain|default('—') }}</span>
+      </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      {% if order.unpaid_invoice_id %}
+        <a class="btn btn-primary" href="{{ 'invoice'|link }}/{{ order.unpaid_invoice_id }}">Payer la facture</a>
+      {% endif %}
+      <a class="btn btn-ghost" href="{{ 'support'|link }}?ticket=1">Ouvrir un ticket</a>
+      <button id="btn-cancel" class="btn btn-ghost">Demander une annulation</button>
+    </div>
+  </div>
+</div>
+
+<div class="ow-card ow-pad">
+  <h5 class="mb-3" style="font-weight:800">Prochaines étapes</h5>
+  <div class="d-flex flex-column gap-3">
+    <div class="step"><span class="dot"></span><div>Notre équipe finalise l’installation de votre service.</div></div>
+    {% if order.unpaid_invoice_id %}
+      <div class="step"><span class="dot"></span><div>Le service sera activé dès réception du paiement (facture #{{ order.unpaid_invoice_id }}).</div></div>
+    {% else %}
+      <div class="step"><span class="dot"></span><div>Vous serez notifié par e-mail dès l’activation.</div></div>
+    {% endif %}
+    <div class="step"><span class="dot"></span><div>Besoin d’un ajustement de configuration ? Ouvrez un ticket et dites-nous ce qu’il faut changer.</div></div>
+  </div>
+
+  <hr class="my-3">
+  <div class="row g-3">
+    <div class="col-12 col-md-6">
+      <div class="ow-sub">Créé le</div>
+      <div>{{ order.created_at|format_date }}</div>
+    </div>
+    <div class="col-12 col-md-6">
+      <div class="ow-sub">Cycle & Montant</div>
+      <div>
+        {% if order.period %}{{ order.total|money(order.currency) }} · {{ mf.period_name(order.period) }}
+        {% else %}{{ order.total|money(order.currency) }}{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+ (function(){
+   const api = (window.FOSSBilling && window.FOSSBilling.api) ? window.FOSSBilling.api() : null;
+   async function postCompat(endpoint, data){
+     data = Object.assign({ CSRFToken: '{{ CSRFToken }}' }, data||{});
+     if (api) return await api.post(endpoint, data);
+     const fd = new FormData(); Object.entries(data).forEach(([k,v])=>fd.append(k,v));
+     const r = await fetch('{{ "api/"|link }}'+endpoint, {method:'POST', body:fd});
+     try{ return await r.json(); }catch{ return {}; }
+   }
+   document.getElementById('btn-cancel')?.addEventListener('click', async ()=>{
+     if(!confirm('Confirmer la demande d’annulation de cette commande ?')) return;
+     try{
+       await postCompat('client/order/cancel', { id: {{ order.id }} });
+       alert('Demande d’annulation envoyée.'); location.reload();
+     }catch(_){
+       try{
+         await postCompat('client/order/request_cancellation', { id: {{ order.id }} });
+         alert('Demande d’annulation envoyée.'); location.reload();
+       }catch(e){ alert(e?.message || 'Échec de la demande.'); }
+     }
+   });
+ })();
+</script>
+<br>
+{% elseif order.status == 'active' %}
+{# … ici ton affichage “actif” (la version moderne qu’on a faite) … #}
+{% else %}
+  <div class="ow-card ow-pad text-muted">Ce service n’est pas actif.</div>
+{% endif %}
+
+{% if order.status == 'active' %}
+
+<style>
+  :root{
+    --ow-border: var(--bs-border-color, #e5e7eb);
+    --ow-soft: 0 10px 26px rgba(13,71,255,.08);
+    --ow-primary:#0d47ff;
+    --ow-primary-600:#0b3fe0;
+  }
+
+  /* Cartes / layout */
+  .ow-card{background:#fff;border:1px solid var(--ow-border);border-radius:18px;box-shadow:var(--ow-soft)}
+  .ow-pad{padding:20px}
+  .ow-h1{font-weight:800;font-size:1.35rem;margin:0}
+  .ow-sub{color:#6b7280}
+  .ow-header{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between}
+  .ow-actions .btn{border-radius:12px}
+
+  /* Boutons */
+  .btn-primary{background:var(--ow-primary);border-color:var(--ow-primary)}
+  .btn-primary:hover{background:var(--ow-primary-600);border-color:var(--ow-primary-600)}
+  .btn-ghost{background:#fff;border:1px solid var(--ow-border);color:#0d2a6b}
+  .btn-ghost:hover{background:#f8faff;border-color:#dbe5ff}
+
+  /* Chips statut */
+  .chip{border-radius:999px;padding:.35rem .6rem;font-weight:700;font-size:.75rem;display:inline-block}
+  .chip-ok{background:#e8f8ee;color:#166534}
+
+  /* Hero gauche */
+  .hero{background:linear-gradient(180deg,#1f4fff 0%,#0b38d8 100%); border-radius:18px;color:#fff;display:flex;flex-direction:column}
+  .hero-body{padding:26px 22px 12px;display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1}
+  .hero-icon{opacity:.9}
+  .hero-domain{background:rgba(255,255,255,.10);padding:12px 16px;border-bottom-left-radius:18px;border-bottom-right-radius:18px;display:flex;align-items:center;justify-content:space-between}
+  .hero-domain a.btn{border-color:#fff;color:#0d47ff;background:#fff;border-radius:12px;padding:.35rem .65rem}
+
+  /* Tableau info */
+  .kv td{padding:.6rem .75rem;border-top:1px solid var(--ow-border)}
+  .kv td:first-child{width:40%;color:#6b7280}
+  .kv a{color:#0d47ff;text-decoration:none}
+  .kv a:hover{text-decoration:underline}
+
+  /* Carte “aide” */
+  .help-row{display:flex;gap:10px;align-items:flex-start;color:#6b7280}
+  .help-row i{color:#0d47ff}
+
+  /* Masque l’ancienne carte du thème si présente */
+  .card.mb-4 {display:none !important;}
+
+  /* Colonnes de même hauteur */
+  .col-stretch{display:flex;flex-direction:column}
+  .stretch-card{flex:1 1 auto;display:flex}
+  .stretch-card > .ow-card{flex:1 1 auto;}
+</style>
+
+{# ===== En-tête ===== #}
+<div class="ow-card ow-pad mb-3">
+  <div class="ow-header">
+    <div>
+      <div class="ow-h1">{{ order.title }}</div>
+      <div class="mt-1">
+        <span class="chip chip-ok">Actif</span>
+        <span class="ow-sub ms-2">{{ service.domain }}</span>
+      </div>
+    </div>
+    {% set site_url = 'http://' ~ service.domain %}
+    <div class="ow-actions d-flex flex-wrap gap-2">
+      <button id="btn-cpanel" class="btn btn-primary">
+        <i class="bi bi-box-arrow-in-right me-1"></i> Se connecter à cPanel
+      </button>
+      <a class="btn btn-ghost" target="_blank" href="{{ site_url }}">
+        <i class="bi bi-globe2 me-1"></i> Voir le site
+      </a>
+      <a class="btn btn-ghost" href="{{ 'support'|link }}?ticket=1">
+        <i class="bi bi-life-preserver me-1"></i> Ouvrir un ticket
+      </a>
+      <button id="btn-renew" class="btn btn-ghost">
+        <i class="bi bi-arrow-repeat me-1"></i> Renouveler maintenant
+      </button>
+      <button id="btn-cancel" class="btn btn-ghost">
+        <i class="bi bi-x-octagon me-1"></i> Demander une annulation
+      </button>
+    </div>
+  </div>
+</div>
+
+{# ===== Deux colonnes (gauche = hero; droite = infos). Les deux cartes prennent la même hauteur. ===== #}
+<div class="row g-3 align-items-stretch">
+  {# Colonne gauche #}
+  <div class="col-12 col-lg-6 col-stretch">
+    <div class="stretch-card">
+      <div class="hero ow-card">
+        <div class="hero-body text-center">
+          <div class="hero-icon mb-3">
+            <svg width="58" height="58" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"></path>
+              <path d="M12 12l8-4.5"></path>
+              <path d="M12 12v9"></path>
+              <path d="M12 12L4 7.5"></path>
+            </svg>
+          </div>
+          <div style="font-weight:800;font-size:1.15rem">{{ service.domain }}</div>
+          <div class="mt-3 d-flex justify-content-center gap-2">
+            <button class="btn btn-light btn-sm" id="btn-cpanel-2">cPanel</button>
+            <a class="btn btn-outline-light btn-sm" target="_blank" href="{{ site_url }}">Voir le site</a>
+          </div>
+        </div>
+        <div class="hero-domain">
+          <span class="text-white-50 small">{{ service.domain }}</span>
+          <a class="btn btn-light btn-sm" target="_blank" href="{{ site_url }}">Visiter</a>
+        </div>
+      </div>
+    </div>
+
+    {# Bloc aide sous la tuile bleue (n’influe pas sur la hauteur de la tuile) #}
+    <div class="ow-card ow-pad mt-3">
+      <div class="help-row">
+        <i class="bi bi-info-circle"></i>
+        <div class="small">
+          Une question ou un incident ? Cliquez sur <strong>Ouvrir un ticket</strong> pour contacter notre support rapidement.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# Colonne droite #}
+  <div class="col-12 col-lg-6 col-stretch">
+    <div class="stretch-card">
+      <div class="ow-card">
+        <div class="ow-pad">
+          <h5 class="mb-2" style="font-weight:800">Informations du service</h5>
+          {% set server = service.server %}
+          {% set hp = service.hosting_plan %}
+          <div class="table-responsive">
+            <table class="table kv m-0">
+              <tbody>
+                <tr>
+                  <td>Domaine</td>
+                  <td><a target="_blank" href="{{ site_url }}">{{ service.domain }}</a></td>
+                </tr>
+                <tr>
+                  <td>Date d’enregistrement</td>
+                  <td>{{ order.created_at|format_date }}</td>
+                </tr>
+                <tr>
+                  <td>Montant récurrent</td>
+                  <td>
+                    {% if order.period %}
+                      {{ order.total | money(order.currency) }} · {{ mf.period_name(order.period) }}
+                    {% else %}
+                      {{ order.total | money(order.currency) }}
+                    {% endif %}
+                  </td>
+                </tr>
+                <tr>
+                  <td>Cycle de facturation</td>
+                  <td>{% if order.period %}{{ mf.period_name(order.period) }}{% else %}—{% endif %}</td>
+                </tr>
+                <tr>
+                  <td>Prochaine échéance</td>
+                  <td>{% if order.expires_at %}{{ order.expires_at|format_date }}{% else %}—{% endif %}</td>
+                </tr>
+                <tr>
+                  <td>Moyen de paiement</td>
+                  <td>{{ order.gateway|default('—') }}</td>
+                </tr>
+                <tr>
+                  <td>IP du serveur</td>
+                  <td>{{ server.ip }}</td>
+                </tr>
+                <tr>
+                  <td>Nom d’hôte serveur</td>
+                  <td>{{ server.hostname }}</td>
+                </tr>
+                <tr>
+                  <td>Nom d’utilisateur</td>
+                  <td>{{ service.username }}</td>
+                </tr>
+                <tr>
+                  <td>Offre d’hébergement</td>
+                  <td>{{ hp.name }}</td>
+                </tr>
+                <tr>
+                  <td>Bande passante</td>
+                  <td>{{ hp.bandwidth }} MB / mois</td>
+                </tr>
+                <tr>
+                  <td>Espace disque</td>
+                  <td>{{ hp.quota }} MB</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {% if service.domain_order_id %}
+            <div class="mt-3">
+              <a class="btn btn-ghost" href="{{ '/order/service/manage'|link }}/{{ service.domain_order_id }}">Gérer le domaine</a>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const api = (window.FOSSBilling && window.FOSSBilling.api) ? window.FOSSBilling.api() : null;
+
+    // Connexion cPanel : redirige vers l’URL renvoyée (string | {url} | {result})
+    async function cpanelLogin() {
+      try {
+        if (api) {
+          const r = await api.post('client/servicehosting/get_login_url', {
+            order_id: {{ order.id }},
+            CSRFToken: '{{ CSRFToken }}'
+          });
+          const url = (typeof r === 'string') ? r : (r && (r.url || r.result));
+          if (url) { window.location.href = url; return; }
+        }
+        const fd = new FormData();
+        fd.append('order_id', '{{ order.id }}');
+        fd.append('CSRFToken', '{{ CSRFToken }}');
+        const resp = await fetch('{{ "api/client/servicehosting/get_login_url"|link }}', { method:'POST', body: fd });
+        const text = await resp.text();
+        let url = '';
+        try { const j = JSON.parse(text); url = j && (j.result || j.url) || ''; }
+        catch { if (/^https?:\/\//i.test(text.trim())) url = text.trim(); }
+        if (url) { window.location.href = url; return; }
+        alert('Impossible d’obtenir le lien de connexion cPanel.');
+      } catch (e) {
+        alert(e.message || 'Erreur de connexion au panneau.');
+      }
+    }
+    document.getElementById('btn-cpanel')?.addEventListener('click', cpanelLogin);
+    document.getElementById('btn-cpanel-2')?.addEventListener('click', cpanelLogin);
+
+    // Wrapper POST (API moderne ou fallback)
+    async function postCompat(endpoint, data) {
+      const payload = Object.assign({ CSRFToken: '{{ CSRFToken }}' }, data || {});
+      if (api) return await api.post(endpoint, payload);
+      const fd = new FormData();
+      Object.entries(payload).forEach(([k,v]) => fd.append(k, v));
+      const resp = await fetch('{{ "api/"|link }}' + endpoint, { method:'POST', body: fd });
+      try { return await resp.json(); } catch { return {}; }
+    }
+
+    // Renouveler maintenant
+    document.getElementById('btn-renew')?.addEventListener('click', async () => {
+      if (!confirm('Générer une facture de renouvellement maintenant ?')) return;
+      try {
+        const r = await postCompat('client/order/renew', { id: {{ order.id }} });
+        if (r && r.invoice_hash) {
+          window.location.href = '{{ "invoice"|link }}/' + r.invoice_hash;
+        } else {
+          alert('Renouvellement initié. Consultez vos factures.');
+          location.reload();
+        }
+      } catch (_) {
+        try {
+          const r2 = await postCompat('client/order/renew_now', { id: {{ order.id }} });
+          if (r2 && r2.invoice_hash) {
+            window.location.href = '{{ "invoice"|link }}/' + r2.invoice_hash;
+          } else {
+            alert('Renouvellement créé. Vérifiez vos factures.');
+            location.reload();
+          }
+        } catch (err) {
+          alert(err && err.message ? err.message : 'Impossible de créer la facture de renouvellement.');
+        }
+      }
+    });
+
+    // Demander une annulation
+    document.getElementById('btn-cancel')?.addEventListener('click', async () => {
+      if (!confirm('Confirmer la demande d’annulation de ce service ?')) return;
+      try {
+        await postCompat('client/order/cancel', { id: {{ order.id }} });
+        alert('Demande d’annulation envoyée.');
+        location.reload();
+      } catch (_) {
+        try {
+          await postCompat('client/order/request_cancellation', { id: {{ order.id }} });
+          alert('Demande d’annulation envoyée.');
+          location.reload();
+        } catch (err) {
+          alert(err && err.message ? err.message : 'La demande d’annulation a échoué.');
+        }
+      }
+    });
+  })();
+</script>
+
+{% else %}
+  <div class="ow-card ow-pad text-muted">Ce service n’est pas actif.</div>
+{% endif %}

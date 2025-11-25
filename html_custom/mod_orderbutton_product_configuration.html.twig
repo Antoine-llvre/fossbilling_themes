@@ -1,0 +1,83 @@
+{% set product = request.order ? guest.product_get({"id":request.order}) : null %}
+{% if not product %}
+  <div class="alert alert-warning mb-0">Produit introuvable.</div>
+{% else %}
+  <form method="post"
+        action="{{ '/order'|link }}/{{ product.slug }}"
+        id="add-to-cart"
+        onsubmit="return false;">
+    <input type="hidden" name="CSRFToken" value="{{ CSRFToken }}">
+    <input type="hidden" name="multiple" value="1">
+    <input type="hidden" name="id" value="{{ product.id }}">
+
+    <div class="card mb-3">
+      <div class="card-header">
+        <strong>{{ product.title }}</strong>
+      </div>
+      <div class="card-body">
+        {% if product.description %}
+          <div class="text-muted mb-2">{{ product.description|markdown }}</div>
+        {% endif %}
+
+        {# Prix / période #}
+        <div class="mb-3">
+          {% if product.pricing.type == 'recurrent' %}
+            {% set periods = guest.system_periods %}
+            <label class="form-label">Période</label>
+            <select name="period" class="form-select" id="period-selector" required>
+              {% for code,prices in product.pricing.recurrent %}
+                {% if prices.enabled %}
+                  <option value="{{ code }}">{{ periods[code] }} — {{ prices.price | money_convert }}</option>
+                {% endif %}
+              {% endfor %}
+            </select>
+          {% elseif product.pricing.type == 'free' %}
+            <span class="badge bg-info">GRATUIT</span>
+          {% else %}
+            <span class="badge bg-info">{{ product.pricing.once.price | money_convert }}</span>
+          {% endif %}
+        </div>
+
+        {# Formulaire custom (service_* ou formbuilder) #}
+        {% set tpl = "mod_service"~product.type~"_order_form.html.twig" %}
+        {% if guest.system_template_exists({"file":tpl}) %}
+          {% include tpl with product %}
+        {% elseif product.form_id and guest.extension_is_on({"mod":"formbuilder"}) %}
+          {% set form = guest.formbuilder_get({"id":product.form_id}) %}
+          {% include 'mod_formbuilder_build.html.twig' with product %}
+        {% endif %}
+      </div>
+    </div>
+
+    {# Addons éventuels #}
+    {% include 'mod_orderbutton_addons.html.twig' with product %}
+
+    <div class="d-flex gap-2">
+      <a href="{{ 'order'|link }}" class="btn btn-outline-secondary">⟵ Retour</a>
+      <button type="submit" class="btn btn-primary">
+        Ajouter au panier
+      </button>
+    </div>
+  </form>
+
+  {# JS d’ajout au panier (API moderne) #}
+  <script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const api = (window.FOSSBilling && window.FOSSBilling.api) ? window.FOSSBilling.api() : null;
+    const form = document.getElementById('add-to-cart');
+    if (!form || !api) return;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        const data = Object.fromEntries(new FormData(form).entries());
+        await api.post('guest/cart/add_item', data);
+        const extra = {{ request.show_custom_form_values ? "'&show_custom_form_values=1'" : "''" }};
+        window.location.href = "{{ 'orderbutton'|link({ 'checkout': 1 }) }}" + extra;
+      } catch (err) {
+        alert(err.message || 'Impossible d’ajouter au panier');
+      }
+    });
+  });
+  </script>
+{% endif %}

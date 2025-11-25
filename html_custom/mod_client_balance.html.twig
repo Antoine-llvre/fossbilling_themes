@@ -1,0 +1,146 @@
+{% extends request.ajax ? "layout_blank.html.twig" : "layout_default.html.twig" %}
+{% import "macro_functions.html.twig" as mf %}
+
+{% block meta_title %}{{ 'Wallet'|trans }}{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active" aria-current="page">{{ 'Wallet'|trans }}</li>{% endblock %}
+
+{% set profile = client.profile_get %}
+
+{% block body_class %}client-balance{% endblock %}
+
+{% block content %}
+
+{# ===== Styles 2025 (full white + arrondis) ===== #}
+<style>
+  :root{
+    --ow-border: var(--bs-border-color, #e5e7eb);
+    --ow-soft: 0 10px 26px rgba(13,71,255,.08);
+  }
+  body.client-balance .card{ background:#fff !important; border:1px solid var(--ow-border) !important; border-radius:18px !important; box-shadow:var(--ow-soft) }
+  body.client-balance .card-header{ background:#fff !important; border-bottom:1px solid var(--ow-border) !important; border-top-left-radius:18px; border-top-right-radius:18px }
+  body.client-balance .card-body{ background:#fff !important; padding:20px !important }
+  body.client-balance .table{ background:#fff !important; border-radius:14px }
+  body.client-balance .table thead th{ background:#fff; position:sticky; top:0; z-index:1; border-bottom:1px solid var(--ow-border) }
+  body.client-balance .form-control, 
+  body.client-balance .input-group-text,
+  body.client-balance .btn { border-radius:12px !important }
+  .ow-toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+  .ow-title{font-weight:800;margin:0}
+  .ow-sub{color:#6b7280}
+  .ow-balance{font-weight:800}
+  .ow-balance small{font-weight:600;color:#6b7280}
+</style>
+
+<div class="row">
+  <div class="col-md-12">
+    <div class="card mb-4">
+      <div class="card-header py-3">
+        <div class="ow-toolbar">
+          <div>
+            <h1 class="ow-title">{{ 'Wallet'|trans }}</h1>
+            <div class="ow-sub small">{{ 'Here you can manage and track your account balance.'|trans }}</div>
+          </div>
+          <div class="text-end">
+            <div class="ow-balance">
+              {{ profile.balance | money(profile.currency) }}
+              <small class="ms-1">{{ 'Current balance'|trans }}</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-body">
+        {# Formulaire d’ajout de fonds #}
+        <form method="post"
+              class="api-form"
+              action="{{ 'api/client/invoice/funds_invoice'|link }}"
+              data-api-jsonp="onAfterInvoiceCreated">
+          <input type="hidden" name="CSRFToken" value="{{ CSRFToken }}"/>
+
+          <div class="row g-2 align-items-end">
+            <div class="col-12 col-md-6 col-lg-4">
+              <label class="form-label">{{ 'Amount to add'|trans }}</label>
+              <div class="input-group">
+                <span class="input-group-text">{{ profile.currency }}</span>
+                <input id="wallet-amount"
+                       class="form-control"
+                       type="number"
+                       inputmode="decimal"
+                       name="amount"
+                       min="1"
+                       step="0.01"
+                       placeholder="0.00"
+                       required>
+              </div>
+              <div class="form-text">{{ 'An invoice will be generated. You can choose a payment method on the next screen.'|trans }}</div>
+            </div>
+            <div class="col-12 col-md-auto">
+              <button class="btn btn-primary px-4" type="submit">{{ 'Add funds'|trans }}</button>
+            </div>
+          </div>
+        </form>
+
+        <hr class="my-4">
+
+        {# Liste des mouvements #}
+        {% set transactions = client.client_balance_get_list({ "per_page": 10, "page": request.page }) %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th style="width:55%">{{ 'Description'|trans }}</th>
+                <th style="width:20%">{{ 'Date'|trans }}</th>
+                <th class="text-end" style="width:25%">{{ 'Amount'|trans }}</th>
+              </tr>
+            </thead>
+            <tbody>
+            {% for i, tx in transactions.list %}
+              <tr>
+                <td>{{ tx.description }}</td>
+                <td>{{ tx.created_at|format_date }}</td>
+                <td class="text-end">{{ tx.amount|money(tx.currency) }}</td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="3" class="text-center text-muted py-4">{{ 'The list is empty'|trans }}</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="2"><strong>{{ 'Total'|trans }}</strong></td>
+                <td class="text-end"><strong>{{ profile.balance | money(profile.currency) }}</strong></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div class="mt-3">
+          {{ include('partial_pagination.html.twig', { 'list': transactions }) }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+  // Callback appelé par la réponse API (api-form)
+  function onAfterInvoiceCreated(hash) {
+    // Redirige directement vers la facture pour choisir un moyen de paiement
+    var link = '{{ "invoice"|link }}/' + hash;
+    window.location.href = link;
+  }
+
+  // Petite validation UX : empêche valeurs <= 0
+  document.addEventListener('DOMContentLoaded', () => {
+    const amt = document.getElementById('wallet-amount');
+    if (!amt) return;
+    amt.addEventListener('change', () => {
+      const v = parseFloat(amt.value.replace(',', '.'));
+      if (isNaN(v) || v <= 0) { amt.value = ''; amt.focus(); }
+    });
+  });
+</script>
+{% endblock %}
